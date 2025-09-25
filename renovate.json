@@ -1,6 +1,65 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
-  ]
+    ":dependencyDashboard",
+    ":semanticPrefixFixDepsChoreOthers",
+    "group:dotNetCore",
+    "group:monorepos",
+    "group:recommended",
+    "replacements:all",
+    "workarounds:all",
+    "config:best-practices",
+    "schedule:daily"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "nuget"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "groupName": "ApplicationInsights",
+      "matchPackageNames": [
+        "/ApplicationInsights/"
+      ]
+    },
+    {
+      "groupName": "Dotnet",
+      "matchPackageNames": [
+        "dotnet-sdk",
+        "mcr.microsoft.com/dotnet/aspnet",
+        "mcr.microsoft.com/dotnet/sdk",
+        "mcr.microsoft.com/dotnet/runtime",
+        "mcr.microsoft.com/dotnet/runtime-deps"
+      ],
+      "extends": [
+        ":disableMajorUpdates",
+        ":pinDigestsDisabled"
+      ]
+    },
+    {
+      "groupName": "System.CommandLine",
+      "matchPackageNames": [
+        "System.CommandLine{/,}**"
+      ]
+    },
+    {
+      "groupName": "XUnit",
+      "matchPackageNames": [
+        "xunit{/,}**"
+      ]
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "Pipeline dependencies"
+    }
+  ],
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "dependencyDashboard": true,
+  "gitAuthor": "Renovate Bot <bot@renovateapp.com>"
 }
