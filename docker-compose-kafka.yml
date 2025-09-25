@@ -18,7 +18,7 @@ services:
   
   kafka:
     container_name: kafka
-    image: confluentinc/cp-kafka:8.0.0
+    image: confluentinc/cp-kafka:7.3.1
     restart: unless-stopped
     depends_on:
       - zookeeper
@@ -62,6 +62,22 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+  kafdrop:
+    container_name: kafdrop
+    image: obsidiandynamics/kafdrop:4.2.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    expose:
+      - 9000
+    ports:
+      - 9000:9000
+    environment:
+      ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_BROKERCONNECT: kafka:29092
+    networks:
+      - kafka-net
 
 networks:
   kafka-net:
