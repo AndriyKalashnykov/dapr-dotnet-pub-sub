@@ -3,8 +3,8 @@
 PORTS:="7006,7007"
 
 build:
-	cd ./consumer && dotnet restore && dotnet build
-	cd ./producer && dotnet restore && dotnet build
+	dotnet restore dapr-dotnet-pub-sub.sln
+	dotnet build dapr-dotnet-pub-sub.sln
 
 upgrade: build
 	@cd consumer && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
