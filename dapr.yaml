@@ -1,0 +1,14 @@
+version: 1
+common:
+  resourcesPath: ./components/
+apps:
+  - appID: consumer-sdk
+    appDirPath: ./consumer/
+    resourcesPath: ./components/
+    appPort: 7006
+    command: [ "dotnet", "run" ]
+  - appID: producer-sdk
+    appDirPath: ./producer/
+    resourcesPath: ./components/
+    appPort: 7007
+    command: [ "dotnet", "run" ]
