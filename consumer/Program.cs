@@ -1,24 +1,19 @@
-using System.Text.Json.Serialization;
-using Dapr;
-using PubSub.Common;
-
 var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+// Configure Kestrel to listen on the port from DAPR_APP_PORT
+var daprPort = Environment.GetEnvironmentVariable("DAPR_APP_PORT");
+var port = !string.IsNullOrEmpty(daprPort) ? int.Parse(daprPort) : 5230;
+builder.WebHost.UseUrls($"http://*:{port}");
 
-// Dapr will send serialized event object vs. being raw CloudEvent
+var app = builder.Build();
 app.UseCloudEvents();
 
-// needed for Dapr pub/sub routing
-app.MapSubscribeHandler();
+app.MapPost("/messagehandler", (
+    TinyMessage message) =>
+{
+    Console.WriteLine($"Received message {message.Id}.");
 
-if (app.Environment.IsDevelopment()) {app.UseDeveloperExceptionPage();}
-
-// Dapr subscription in [Topic] routes orders topic to this route
-app.MapPost("/orders", [Topic("orderpubsub-kafka", "orders")] (Order order) => {
-    Console.WriteLine(" received : " + order);
-    return Results.Ok(order);
+    return Results.Accepted();
 });
 
-await app.RunAsync();
-
+app.Run();

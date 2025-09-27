@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-PORTS:="7006,7007"
+PORTS:="3530,3531,5233,5234,7006,7007"
 
 build:
 	dotnet restore dapr-dotnet-pub-sub.sln

@@ -1,0 +1,1 @@
+public record TinyMessage(Guid Id, DateTimeOffset TimeStamp);

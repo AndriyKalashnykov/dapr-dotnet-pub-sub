@@ -2,4 +2,6 @@
 
 namespace PubSub.Common;
 
-public record Order([property: JsonPropertyName("orderId")] int OrderId);
+public record Order(
+    [property: JsonPropertyName("orderId")]
+    int OrderId);
