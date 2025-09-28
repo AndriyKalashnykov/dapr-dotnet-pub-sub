@@ -16,7 +16,7 @@ builder.WebHost.UseUrls($"http://*:{port}");
 
 var app = builder.Build();
 
-const string PubSubComponentName = "orderpubsub-kafka";
+const string PubSubComponentName = "message-pubsub-kafka";
 const string TopicName = "incoming-messages";  // Changed from "orders" to match subscription.yaml
 
 // Dummy endpoint for /dapr/config to avoid 404 log noise
@@ -111,7 +111,7 @@ app.Run();
 //     using var client = new DaprClientBuilder().Build();
 //
 //     // Publish an event/message using Dapr PubSub
-//     await client.PublishEventAsync("orderpubsub-kafka", "orders", order);
+//     await client.PublishEventAsync("message-pubsub-kafka", "orders", order);
 //     Console.WriteLine(" sent: " + order);
 //
 //     await Task.Delay(TimeSpan.FromSeconds(1));
