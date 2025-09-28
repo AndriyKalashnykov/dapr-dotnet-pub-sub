@@ -1,18 +1,18 @@
 version: 1
 common:
-  resourcesPath: ./components/
+  resourcesPath: components
   appLogDestination: fileAndConsole
   daprdLogDestination: fileAndConsole
 apps:
   # Producer app: publishes messages to Kafka
   - appID: producer
-    appDirPath: ./producer/
+    appDirPath: producer
     appPort: 5231
     daprHTTPPort: 3531
     command: [ "dotnet", "run" ]
   # Consumer app: subscribes to messages from Kafka
   - appID: consumer
-    appDirPath: ./consumer/
+    appDirPath: consumer
     appPort: 5230
     daprHTTPPort: 3530
     command: [ "dotnet", "run" ]

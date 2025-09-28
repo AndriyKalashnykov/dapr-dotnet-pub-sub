@@ -9,12 +9,15 @@ spec:
     - name: brokers
       value: "localhost:9092"
     - name: consumerGroup
-      value: "consumer"
+      value: "order-group"  # Changed for clarity
     - name: authType
       value: "none"
     - name: authRequired
       value: "false"
     - name: clientID
-      value: "consumer-client"
-    - name: disableTls # Optional. Disable TLS. This is not safe for production!! You should read the `Mutual TLS` section for how to use TLS.
+      value: "dapr-pubsub-client"  # Changed to be more generic
+    - name: disableTls
       value: "true"
+scopes:
+  - producer
+  - consumer

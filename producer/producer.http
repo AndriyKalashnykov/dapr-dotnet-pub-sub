@@ -1,33 +1,24 @@
-### Define a pre-request script to handle the conditional variable
-// @name localDateTime
-
-{%
-    // Try to get the ISO datetime
-    const isoDateTime = request.variables.get("$datetime iso8601");
-
-    // Check if it was properly substituted (not still showing as a template)
-    if (isoDateTime && !isoDateTime.includes("{{$datetime")) {
-        // If datetime was properly substituted, use it
-        client.global.set("conditionalValue", isoDateTime);
-    } else {
-        // Otherwise, use a random UUID
-        client.global.set("conditionalValue", request.variables.get("$random.uuid"));
-    }
-%}
-
 ### Declarative Subscription
-@senderUrl=http://localhost:7006
-### Send
+@senderUrl=http://localhost:5231
+### Send generated
 POST {{senderUrl}}/send
 Content-Type: application/json
 
 {
     "id": "{{$guid}}",
-    "timeStamp": "{{localDateTime}}"
+    "timeStamp": "{{$datetime iso8601}}"
 }
 
+### Send static
+POST {{senderUrl}}/send
+Content-Type: application/json
 
-### Send as Bytes
+{
+  "id": "e9cdd036-c529-4bf9-bd59-d7148ef9237d",
+  "timeStamp": "2025-09-26T02:52:04.835Z"
+}
+
+### Send as Bytes generated
 POST {{senderUrl}}/sendasbytes
 Content-Type: application/json
 
@@ -36,3 +27,11 @@ Content-Type: application/json
     "timeStamp": "{{$datetime iso8601}}"
 }
 
+### Send as Bytes static
+POST {{senderUrl}}/sendasbytes
+Content-Type: application/json
+
+{
+  "id": "c6699d32-727b-4e2d-8eaf-9047f461cd34",
+  "timeStamp": "2025-09-26T02:56:00.515Z"
+}
