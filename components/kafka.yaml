@@ -18,6 +18,18 @@ spec:
       value: "dapr-pubsub-client"  # Changed to be more generic
     - name: disableTls
       value: "true"
+    - name: maxRetryCount
+      value: "5"
+    - name: backOffDuration
+      value: "2s"
+    - name: circuitBreaker
+      value: "true"
+    - name: circuitBreakerFailureThreshold
+      value: "5"
+    - name: circuitBreakerRecoveryThreshold
+      value: "3"
+    - name: circuitBreakerTimeout
+      value: "30s"
 scopes:
   - producer
   - consumer

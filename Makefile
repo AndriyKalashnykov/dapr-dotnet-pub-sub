@@ -1,17 +1,24 @@
 .DEFAULT_GOAL := build
 
-PORTS:="3530,3531,5233,5234,7006,7007"
+PORTS:="3530,3531,3532,5230,5231,5232,7006,7007"
 
 build:
 	dotnet restore dapr-dotnet-pub-sub.sln
 	dotnet build dapr-dotnet-pub-sub.sln
 
-upgrade: build
+update: build
 	@cd consumer && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
 	@cd producer && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
 
-run: build
+run: build stop
 	dapr run -f .
+
+#post:
+#	curl -X POST http://localhost:5232/v1.0/publish/message-pubsub-kafka/incoming-messages -d '{"id": "e9cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z"}'
+
+post:
+	curl -X POST http://localhost:5232/send -H "Content-Type: application/json" -d '{"id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z"}'
+	curl -X POST http://localhost:5232/sendasbytes -H "Content-Type: application/json" -d '{"id": "b2cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-27T02:52:04.835Z"}'
 
 stop-dapr:
 	dapr stop -f .

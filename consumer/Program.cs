@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure Kestrel to listen on the port from DAPR_APP_PORT
 var daprPort = Environment.GetEnvironmentVariable("DAPR_APP_PORT");
-var port = !string.IsNullOrEmpty(daprPort) ? int.Parse(daprPort) : 5230;
+var port = !string.IsNullOrEmpty(daprPort) ? int.Parse(daprPort) : 5231;
 builder.WebHost.UseUrls($"http://*:{port}");
 
 // Add services for handling Dapr pub/sub
