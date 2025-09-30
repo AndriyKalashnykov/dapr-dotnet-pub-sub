@@ -21,9 +21,21 @@ app.Use(async (context, next) => {
     await next();
 });
 
-app.MapPost("/messagehandler", (TinyMessage message) =>
+app.MapPost("/handletype1", (TinyMessage message) =>
 {
-    Console.WriteLine($"Received message {message.Id}, timestamp: {message.TimeStamp}");
+    Console.WriteLine($"/handletype1 - Received message {message.Id}, timestamp: {message.TimeStamp}");
+    return Results.Accepted();
+});
+
+app.MapPost("/handletype2", (TinyMessage message) =>
+{
+    Console.WriteLine($"/handletype2 - Received message {message.Id}, timestamp: {message.TimeStamp}");
+    return Results.Accepted();
+});
+
+app.MapPost("/dafault-messagehandler", (TinyMessage message) =>
+{
+    Console.WriteLine($"/dafault-messagehandler - Received message {message.Id}, timestamp: {message.TimeStamp}");
     return Results.Accepted();
 });
 

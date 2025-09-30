@@ -1,12 +1,13 @@
 namespace Common;
 
-public record TinyMessage(Guid Id, DateTimeOffset TimeStamp);
+public record TinyMessage(Guid Id, DateTimeOffset TimeStamp, string Type = "");
 
 // The DTO for incoming HTTP requests
 public class TinyMessageDto
 {
     public string Id { get; set; } = string.Empty;
     public string TimeStamp { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
 
     public TinyMessage ToMessage()
     {
@@ -28,6 +29,6 @@ public class TinyMessageDto
             Console.WriteLine($"Failed to parse timestamp: {TimeStamp}, using current UTC time: {timestamp}");
         }
 
-        return new TinyMessage(id, timestamp);
+        return new TinyMessage(id, timestamp, Type);
     }
 }

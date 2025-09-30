@@ -41,7 +41,7 @@ make run
 
 3. Send a message to the producer app:
 ```bash
-curl -X POST http://localhost:5231/send -H "Content-Type: application/json" -d '{"id": "e9cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z"}'
+curl -X POST http://localhost:5232/send -H "Content-Type: application/json" -d '{"id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z", "type": "2"}'
 ```
 
 The terminal console output should look similar to this:

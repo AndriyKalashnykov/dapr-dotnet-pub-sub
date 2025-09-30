@@ -6,6 +6,11 @@ spec:
   pubsubname: message-pubsub-kafka
   topic: incoming-messages
   routes:
-    default: /messagehandler
+    rules:
+      - match: event.data.type == "1"
+        path: /handletype1
+      - match: event.data.type == "2"
+        path: /handletype2   
+    default: /dafault-messagehandler
 scopes:
   - consumer
