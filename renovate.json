@@ -18,7 +18,6 @@
   "labels": [
     "dependencies"
   ],
-  "requiredStatusChecks": ["CI"],
   "packageRules": [
     {
       "groupName": "ApplicationInsights",
