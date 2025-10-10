@@ -2,7 +2,7 @@ services:
   
   zookeeper:
     container_name: zookeeper
-    image: confluentinc/cp-zookeeper:7.9.2
+    image: confluentinc/cp-zookeeper:7.9.2@sha256:c03f6fe4af97d57c42518b8deaf2753ed338ee414812f258f9cf32c977fe0a53
     restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -18,7 +18,7 @@ services:
   
   kafka:
     container_name: kafka
-    image: confluentinc/cp-kafka:7.3.1
+    image: confluentinc/cp-kafka:7.3.1@sha256:92f3fbd7693fd50858b798114b4886cd36bf51793f54059620c68ba4d97f8f8e
     restart: unless-stopped
     depends_on:
       - zookeeper
@@ -48,7 +48,7 @@ services:
   
   kafka-ui:
     container_name: kafka-ui
-    image: provectuslabs/kafka-ui:v0.7.2
+    image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
     ports:
       - 9080:8080
     environment:
@@ -65,7 +65,7 @@ services:
 
   kafdrop:
     container_name: kafdrop
-    image: obsidiandynamics/kafdrop:4.2.0
+    image: obsidiandynamics/kafdrop:4.2.0@sha256:63f1d716890d3e5af7f1952efc0642c0d4e731ed0a811a7cedcd940367864a12
     depends_on:
       kafka:
         condition: service_healthy
