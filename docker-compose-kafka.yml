@@ -18,7 +18,7 @@ services:
   
   kafka:
     container_name: kafka
-    image: confluentinc/cp-kafka:7.3.1@sha256:92f3fbd7693fd50858b798114b4886cd36bf51793f54059620c68ba4d97f8f8e
+    image: confluentinc/cp-kafka:7.3.15@sha256:8cc8457280d9fff26007685f1d7d9bc1d7821d16957b20a6c6b49854cc370bd4
     restart: unless-stopped
     depends_on:
       - zookeeper
