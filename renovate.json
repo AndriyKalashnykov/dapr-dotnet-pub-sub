@@ -1,19 +1,24 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
+    "config:best-practices",
+    ":approveMajorUpdates",
+    ":label(dependencies)",
+    ":semanticCommitType(chore)",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests",
     ":dependencyDashboard",
+    ":automergePatch",
+    ":automergePr",
+    ":automergeRequireAllStatusChecks",
+    ":prConcurrentLimitNone",
+    ":separatePatchReleases",
+    "replacements:all",
+    "workarounds:all",
     ":semanticPrefixFixDepsChoreOthers",
     "group:dotNetCore",
     "group:monorepos",
-    "group:recommended",
-    "replacements:all",
-    "workarounds:all",
-    "config:best-practices",
-    "schedule:daily"
-  ],
-  "enabledManagers": [
-    "github-actions",
-    "nuget"
+    "group:recommended"
   ],
   "labels": [
     "dependencies"
@@ -52,12 +57,43 @@
       ]
     },
     {
-      "matchManagers": [
-        "github-actions"
+      "description": "Automerge github-actions updates",
+      "matchManagers": ["github-actions"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Automerge major updates",
+      "matchUpdateTypes": [
+        "major"
       ],
-      "groupName": "Pipeline dependencies"
-    }
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Automerge non-major updates",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest",
+        "internal",
+        "devDependencies",
+        "ref",
+        "none",
+        "security",
+        "grop",
+        "unpin"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
   ],
+  "platformAutomerge": true,
   "prConcurrentLimit": 0,
   "prHourlyLimit": 0,
   "dependencyDashboard": true,
