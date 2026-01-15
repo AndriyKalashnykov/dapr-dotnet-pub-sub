@@ -91,7 +91,7 @@
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true
-    },
+    }
   ],
   "platformAutomerge": true,
   "prConcurrentLimit": 0,
