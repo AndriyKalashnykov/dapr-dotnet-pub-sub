@@ -43,3 +43,5 @@ app.MapPost("/dafault-messagehandler", (TinyMessage message) =>
 app.MapControllers();
 
 app.Run();
+
+namespace Consumer { public partial class Program { } }

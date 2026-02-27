@@ -106,6 +106,8 @@ app.MapPost("/sendasbytes", async (
 
 app.Run();
 
+namespace Producer { public partial class Program { } }
+
 // for (int i = 1; i <= 100; i++) {
 //     var order = new Order(i);
 //     using var client = new DaprClientBuilder().Build();
