@@ -13,20 +13,26 @@
   ],
   "enabledManagers": [
     "github-actions",
-    "nuget"
+    "nuget",
+    "docker-compose"
   ],
   "labels": [
     "dependencies"
   ],
   "packageRules": [
     {
-      "groupName": "ApplicationInsights",
-      "matchPackageNames": [
-        "/ApplicationInsights/"
-      ]
+      "description": "Automerge patch and minor updates (low risk)",
+      "matchUpdateTypes": ["patch", "minor", "pin", "digest"],
+      "automerge": true
     },
     {
-      "groupName": "Dotnet",
+      "description": "Major updates require manual review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "breaking"]
+    },
+    {
+      "groupName": "Dotnet SDK",
       "matchPackageNames": [
         "dotnet-sdk",
         "mcr.microsoft.com/dotnet/aspnet",
@@ -35,39 +41,34 @@
         "mcr.microsoft.com/dotnet/runtime-deps"
       ],
       "extends": [
-        ":disableMajorUpdates",
-        ":pinDigestsDisabled"
+        ":disableMajorUpdates"
       ]
     },
     {
-      "groupName": "System.CommandLine",
-      "matchPackageNames": [
-        "System.CommandLine{/,}**"
-      ]
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "Pipeline dependencies",
+      "pinDigests": true
     },
     {
-      "groupName": "XUnit",
-      "matchPackageNames": [
-        "xunit{/,}**"
-      ]
-    },
-    {
-      "matchManagers": [
-        "github-actions"
-      ],
-      "groupName": "Pipeline dependencies"
+      "description": "Group Kafka/Confluent Docker images",
+      "matchManagers": ["docker-compose"],
+      "groupName": "Docker images",
+      "pinDigests": true
     }
   ],
-  "prConcurrentLimit": 0,
-  "prHourlyLimit": 0,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 3,
   "dependencyDashboard": true,
   "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
   "platformAutomerge": true,
   "automerge": true,
   "automergeType": "squash",
+  "ignoreTests": false,
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "automerge": true
+    "automerge": true,
+    "schedule": ["at any time"]
   },
   "timezone": "America/New_York",
   "commitMessagePrefix": "[renovate]"
