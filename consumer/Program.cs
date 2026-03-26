@@ -16,7 +16,8 @@ var app = builder.Build();
 app.UseCloudEvents();
 
 // For debugging purposes, add request logging
-app.Use(async (context, next) => {
+app.Use(async (context, next) =>
+{
     Console.WriteLine($"Request received: {context.Request.Method} {context.Request.Path}");
     await next();
 });

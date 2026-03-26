@@ -22,7 +22,7 @@ public class TinyMessageDto
 
         DateTime timestamp;
         Console.WriteLine($"Attempting to parse timestamp value: {TimeStamp}");
-        
+
         if (!DateTime.TryParse(TimeStamp, out timestamp))
         {
             timestamp = DateTime.UtcNow; // Use current time if parsing fails

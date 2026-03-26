@@ -32,27 +32,27 @@ app.Use(async (context, next) =>
     {
         // Enable buffering so we can read the body multiple times
         context.Request.EnableBuffering();
-        
+
         if (context.Request.ContentLength > 0)
         {
             // Remember position
             var position = context.Request.Body.Position;
-            
+
             // Read the body
             using var reader = new StreamReader(
                 context.Request.Body,
                 encoding: Encoding.UTF8,
                 detectEncodingFromByteOrderMarks: false,
                 leaveOpen: true);
-                
+
             var requestBody = await reader.ReadToEndAsync();
             Console.WriteLine($"Received request body: {requestBody}");
-            
+
             // Reset the position
             context.Request.Body.Position = position;
         }
     }
-    
+
     await next();
 });
 
@@ -61,7 +61,8 @@ app.MapPost("/send", async (
         DaprClient daprClient,
         ILogger<Program> logger) =>
     {
-        try {
+        try
+        {
             var message = messageDto.ToMessage();
             await daprClient.PublishEventAsync(
                 PubSubComponentName,
@@ -71,10 +72,11 @@ app.MapPost("/send", async (
 
             return Results.Accepted(string.Empty, message.Id);
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             logger.LogError(ex, "Failed to publish message");
             return Results.Problem(
-                detail: $"Failed to publish message: {ex.Message}", 
+                detail: $"Failed to publish message: {ex.Message}",
                 statusCode: 500);
         }
     }
@@ -83,25 +85,28 @@ app.MapPost("/send", async (
 app.MapPost("/sendasbytes", async (
         TinyMessageDto messageDto,
         DaprClient daprClient,
-        ILogger<Program> logger) => {
-        try {
-            var message = messageDto.ToMessage();
-            var content = JsonSerializer.SerializeToUtf8Bytes(message);
-            await daprClient.PublishByteEventAsync(
-                pubsubName: PubSubComponentName,
-                topicName: TopicName,
-                data: content.AsMemory());
-            Console.WriteLine($"Sent message {message.Id}.");
+        ILogger<Program> logger) =>
+{
+    try
+    {
+        var message = messageDto.ToMessage();
+        var content = JsonSerializer.SerializeToUtf8Bytes(message);
+        await daprClient.PublishByteEventAsync(
+            pubsubName: PubSubComponentName,
+            topicName: TopicName,
+            data: content.AsMemory());
+        Console.WriteLine($"Sent message {message.Id}.");
 
-            return Results.Accepted(string.Empty, message.Id);
-        }
-        catch (Exception ex) {
-            logger.LogError(ex, "Failed to publish message as bytes");
-            return Results.Problem(
-                detail: $"Failed to publish message: {ex.Message}",
-                statusCode: 500);
-        }
+        return Results.Accepted(string.Empty, message.Id);
     }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to publish message as bytes");
+        return Results.Problem(
+            detail: $"Failed to publish message: {ex.Message}",
+            statusCode: 500);
+    }
+}
 );
 
 app.Run();
