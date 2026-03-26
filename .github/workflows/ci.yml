@@ -11,8 +11,11 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
@@ -26,6 +29,9 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
         # No need to specify dotnet-version - it will automatically use the version from global.json
+
+      - name: Lint
+        run: make lint
 
       - name: Build
         run: make build

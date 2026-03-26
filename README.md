@@ -24,6 +24,27 @@ And one subscriber:
 
 - Dotnet subscriber `consumer`
 
+## Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `help` | List available tasks |
+| `deps` | Check required tool dependencies |
+| `clean` | Remove build artifacts |
+| `lint` | Run dotnet format to check code style |
+| `build` | Restore and build entire solution |
+| `test` | Run all tests |
+| `update` | Update NuGet packages to latest versions |
+| `run` | Build, stop previous, and run both apps via Dapr |
+| `post` | Send test messages to producer |
+| `stop` | Stop Dapr and kill processes on known ports |
+| `stop-dapr` | Stop Dapr multi-app run |
+| `stop-apps` | Kill processes running on known ports |
+| `kafka-start` | Start Kafka stack |
+| `kafka-stop` | Stop Kafka stack |
+| `ci` | Run full CI pipeline (lint, build, test) |
+| `release` | Create a release tag (usage: `make release VERSION=1.0.0`) |
+
 ## Run all apps with multi-app run template file:
 
 This section shows how to run both applications at once
@@ -33,7 +54,7 @@ with `dapr run -f .`. This enables to you test the interactions between multiple
 1. Open a new terminal window and run Kafka:
 
 ```bash
-make runk
+make kafka-start
 ```
 
 
@@ -80,7 +101,7 @@ The terminal console output should look similar to this:
 
 ```bash
 make stop
-make stopk
+make kafka-stop
 ```
 
 ## Run a single app at a time with Dapr (Optional)
