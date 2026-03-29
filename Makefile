@@ -38,7 +38,8 @@ deps:
 	@echo "All required tools are available."
 
 #deps-act: @ Install act for local CI
-deps-act: deps
+deps-act:
+	@command -v dotnet >/dev/null 2>&1 || { echo "ERROR: dotnet is not installed (need $(DOTNET_VERSION)+)"; exit 1; }
 	@command -v act >/dev/null 2>&1 || { echo "Installing act $(ACT_VERSION)..."; \
 		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
 	}
@@ -49,11 +50,11 @@ clean:
 	@echo "Clean complete."
 
 #lint: @ Run dotnet format to check code style
-lint: deps
+lint:
 	@dotnet format $(SOLUTION) --verify-no-changes --verbosity diagnostic
 
 #build: @ Restore and build entire solution
-build: deps
+build:
 	@dotnet restore $(SOLUTION)
 	@dotnet build $(SOLUTION)
 
@@ -113,7 +114,7 @@ kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
 #ci: @ Run full CI pipeline (lint, build, test)
-ci: deps lint build test
+ci: lint build test
 	@echo "CI pipeline passed."
 
 #ci-run: @ Run GitHub Actions workflow locally using act
