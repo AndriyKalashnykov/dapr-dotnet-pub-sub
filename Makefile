@@ -6,6 +6,7 @@
 DOTNET_VERSION     := 10.0
 DAPR_VERSION       := 1.16.1
 DOCKER_MIN_VERSION := 20.10
+NVM_VERSION        := 0.40.4
 
 # ---------------------------------------------------------------------------
 # Project constants
@@ -19,7 +20,7 @@ SEMVER_RE := ^[0-9]+\.[0-9]+\.[0-9]+$$
 # ---------------------------------------------------------------------------
 
 .PHONY: help deps clean lint build test update run post stop stop-dapr stop-apps \
-        kafka-start kafka-stop ci release
+        kafka-start kafka-stop ci release renovate-bootstrap renovate-validate
 
 #help: @ List available tasks
 help:
@@ -117,3 +118,17 @@ release:
 	@echo "$(VERSION)" | grep -qE '$(SEMVER_RE)' || { echo "ERROR: VERSION=$(VERSION) is not valid semver (expected X.Y.Z)"; exit 1; }
 	@git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo "Tagged v$(VERSION). Push with: git push origin v$(VERSION)"
+
+#renovate-bootstrap: @ Install nvm and npm for Renovate
+renovate-bootstrap:
+	@command -v node >/dev/null 2>&1 || { \
+		echo "Installing nvm $(NVM_VERSION)..."; \
+		curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$(NVM_VERSION)/install.sh | bash; \
+		export NVM_DIR="$$HOME/.nvm"; \
+		[ -s "$$NVM_DIR/nvm.sh" ] && . "$$NVM_DIR/nvm.sh"; \
+		nvm install --lts; \
+	}
+
+#renovate-validate: @ Validate Renovate configuration
+renovate-validate: renovate-bootstrap
+	@npx --yes renovate --platform=local

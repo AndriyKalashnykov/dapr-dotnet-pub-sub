@@ -1,38 +1,41 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    ":dependencyDashboard",
-    ":semanticPrefixFixDepsChoreOthers",
-    "group:dotNetCore",
-    "group:monorepos",
-    "group:recommended",
-    "replacements:all",
-    "workarounds:all",
     "config:best-practices",
-    "schedule:daily"
+    ":semanticCommitType(chore)"
   ],
-  "enabledManagers": [
-    "github-actions",
-    "nuget",
-    "docker-compose"
-  ],
-  "labels": [
-    "dependencies"
-  ],
+  "commitMessagePrefix": "chore(all): ",
+  "commitMessageAction": "update",
+  "commitBody": "Signed-off-by: Renovate Bot <bot@renovateapp.com>",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 50,
+  "prHourlyLimit": 0,
+  "platformAutomerge": true,
+  "automerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "ignoreTests": false,
+  "enabledManagers": ["github-actions", "nuget", "docker-compose"],
+  "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true,
+    "minimumReleaseAge": "0 days"
+  },
   "packageRules": [
     {
-      "description": "Automerge patch and minor updates (low risk)",
-      "matchUpdateTypes": ["patch", "minor", "pin", "digest"],
-      "automerge": true
-    },
-    {
-      "description": "Major updates require manual review",
+      "description": "Wait 3 days before automerging major updates",
       "matchUpdateTypes": ["major"],
-      "automerge": false,
-      "labels": ["dependencies", "breaking"]
+      "minimumReleaseAge": "3 days"
     },
     {
-      "groupName": "Dotnet SDK",
+      "description": "Group GitHub Actions into one PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Group .NET Docker images, disable major updates",
+      "groupName": "Dotnet Docker images",
       "matchPackageNames": [
         "dotnet-sdk",
         "mcr.microsoft.com/dotnet/aspnet",
@@ -40,39 +43,22 @@
         "mcr.microsoft.com/dotnet/runtime",
         "mcr.microsoft.com/dotnet/runtime-deps"
       ],
-      "extends": [
-        ":disableMajorUpdates"
-      ]
+      "extends": [":disableMajorUpdates", ":pinDigestsDisabled"]
     },
     {
-      "description": "Group all GitHub Actions updates",
-      "matchManagers": ["github-actions"],
-      "groupName": "Pipeline dependencies",
-      "pinDigests": true
+      "description": "Group XUnit test dependencies",
+      "groupName": "XUnit",
+      "matchPackageNames": ["/^xunit/"]
     },
     {
-      "description": "Group Kafka/Confluent Docker images",
+      "description": "Group Dapr SDK dependencies",
+      "groupName": "Dapr SDK",
+      "matchPackageNames": ["/^Dapr/"]
+    },
+    {
+      "description": "Group Docker Compose images",
       "matchManagers": ["docker-compose"],
-      "groupName": "Docker images",
-      "pinDigests": true
+      "groupName": "Docker images"
     }
-  ],
-  "prConcurrentLimit": 5,
-  "prHourlyLimit": 3,
-  "dependencyDashboard": true,
-  "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
-  "platformAutomerge": true,
-  "automerge": true,
-  "automergeType": "squash",
-  "ignoreTests": false,
-  "vulnerabilityAlerts": {
-    "labels": ["security"],
-    "automerge": true,
-    "schedule": ["at any time"]
-  },
-  "lockFileMaintenance": {
-    "enabled": false
-  },
-  "timezone": "America/New_York",
-  "commitMessagePrefix": "[renovate]"
+  ]
 }
