@@ -68,3 +68,16 @@ Kafka stack: Zookeeper (:2181), Kafka (:9092), Kafka UI (:9080), Kafdrop (:9000)
 - Dapr SDK: `Dapr.AspNetCore` 1.16.1
 - Kafka as the message broker (Confluent images)
 - CI: GitHub Actions -- lint, build, test (`make lint`, `make build`, `make test`)
+
+## Skills
+
+Use the following skills when working on related files:
+
+| File(s) | Skill |
+|---------|-------|
+| `Makefile` | `/makefile` |
+| `renovate.json` | `/renovate` |
+| `README.md` | `/readme` |
+| `.github/workflows/*.yml` | `/ci-workflow` |
+
+When spawning subagents, always pass conventions from the respective skill into the agent's prompt.
