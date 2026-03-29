@@ -24,26 +24,72 @@ And one subscriber:
 
 - Dotnet subscriber `consumer`
 
-## Makefile Targets
+## Quick Start
+
+```bash
+make deps         # verify required tools (dotnet, docker, dapr)
+make build        # restore and build the solution
+make test         # run all tests
+make kafka-start  # start Kafka stack (in a separate terminal)
+make run          # build and run both apps via Dapr
+```
+
+## Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [GNU Make](https://www.gnu.org/software/make/) | 3.81+ | Build orchestration |
+| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
+| [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.16+ | Sidecar-based pub/sub |
+
+Install all required dependencies:
+
+```bash
+make deps
+```
+
+## Available Make Targets
+
+Run `make help` to see all available targets.
+
+### Build & Run
 
 | Target | Description |
 |--------|-------------|
-| `help` | List available tasks |
-| `deps` | Check required tool dependencies |
-| `clean` | Remove build artifacts |
-| `lint` | Run dotnet format to check code style |
-| `build` | Restore and build entire solution |
-| `test` | Run all tests |
-| `update` | Update NuGet packages to latest versions |
-| `run` | Build, stop previous, and run both apps via Dapr |
-| `post` | Send test messages to producer |
-| `stop` | Stop Dapr and kill processes on known ports |
-| `stop-dapr` | Stop Dapr multi-app run |
-| `stop-apps` | Kill processes running on known ports |
-| `kafka-start` | Start Kafka stack |
-| `kafka-stop` | Stop Kafka stack |
-| `ci` | Run full CI pipeline (lint, build, test) |
-| `release` | Create a release tag (usage: `make release VERSION=1.0.0`) |
+| `make build` | Restore and build entire solution |
+| `make test` | Run all tests |
+| `make lint` | Run dotnet format to check code style |
+| `make clean` | Remove build artifacts |
+| `make run` | Build, stop previous, and run both apps via Dapr |
+| `make post` | Send test messages to producer |
+| `make update` | Update NuGet packages to latest versions |
+
+### Dapr & Kafka
+
+| Target | Description |
+|--------|-------------|
+| `make kafka-start` | Start Kafka stack |
+| `make kafka-stop` | Stop Kafka stack |
+| `make stop` | Stop Dapr and kill processes on known ports |
+| `make stop-dapr` | Stop Dapr multi-app run |
+| `make stop-apps` | Kill processes running on known ports |
+
+### CI
+
+| Target | Description |
+|--------|-------------|
+| `make ci` | Run full CI pipeline (lint, build, test) |
+| `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) |
+
+### Utilities
+
+| Target | Description |
+|--------|-------------|
+| `make deps` | Check required tool dependencies |
+| `make release VERSION=X.Y.Z` | Create a semver-validated release tag |
+| `make renovate-bootstrap` | Install nvm and npm for Renovate |
+| `make renovate-validate` | Validate Renovate configuration |
 
 ## Run all apps with multi-app run template file:
 
@@ -82,8 +128,8 @@ The terminal console output should look similar to this:
 == APP - producer ==       Executing endpoint 'HTTP: POST /send'
 == APP - producer == Failed to parse ID: {{$guid}}, using generated ID: 17eaeb93-f76a-4fc8-848a-10a668f28458
 == APP - producer == Attempting to parse timestamp value: {{$datetime iso8601}}
-== APP - producer == Failed to parse timestamp: {{$datetime iso8601}}, using current UTC time: 9/28/2025 4:30:14 AM
-== APP - producer == Sent message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
+== APP - producer == Failed to parse timestamp: {{$datetime iso8601}}, using current UTC time: 9/28/2025 4:30:14 AM
+== APP - producer == Sent message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
 == APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[1]
 == APP - producer ==       Setting HTTP status code 202.
 == APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[3]
@@ -93,7 +139,7 @@ The terminal console output should look similar to this:
 == APP - producer ==       Executed endpoint 'HTTP: POST /send'
 == APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
 == APP - producer ==       Request finished HTTP/1.1 POST http://localhost:5231/send - 202 - application/json;+charset=utf-8 191.3736ms
-== APP - consumer == Received message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
+== APP - consumer == Received message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
 ...
 ```
 
@@ -133,3 +179,13 @@ dapr run --app-id producer --app-port 5231 --components-path ../components dotne
 dapr stop --app-id consumer
 dapr stop --app-id producer
 ```
+
+## CI/CD
+
+GitHub Actions runs on every push to `main`, tags `v*`, and pull requests.
+
+| Job | Triggers | Steps |
+|-----|----------|-------|
+| **ci** | push, PR, tags | Lint, Build, Test |
+
+[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with platform automerge enabled.

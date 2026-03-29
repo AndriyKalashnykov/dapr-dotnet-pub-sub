@@ -11,6 +11,7 @@ Dapr pub/sub demo with two .NET 10 microservices communicating via Kafka through
 ```bash
 make help           # List available tasks
 make deps           # Check required tool dependencies (dotnet, docker, dapr)
+make deps-act       # Install act for local CI
 make clean          # Remove build artifacts
 make lint           # Run dotnet format to check code style
 make build          # Restore + build entire solution
@@ -24,7 +25,10 @@ make stop-apps      # Kill processes running on known ports
 make kafka-start    # Start Kafka stack (Zookeeper, Kafka, Kafka UI, Kafdrop)
 make kafka-stop     # Stop Kafka stack
 make ci             # Run full CI pipeline (lint, build, test)
+make ci-run         # Run GitHub Actions workflow locally using act
 make release VERSION=X.Y.Z  # Create a semver-validated release tag
+make renovate-bootstrap      # Install nvm and npm for Renovate
+make renovate-validate       # Validate Renovate configuration
 ```
 
 Build a single project: `dotnet build producer/producer.csproj`

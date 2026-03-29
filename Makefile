@@ -7,6 +7,7 @@ DOTNET_VERSION     := 10.0
 DAPR_VERSION       := 1.16.1
 DOCKER_MIN_VERSION := 20.10
 NVM_VERSION        := 0.40.4
+ACT_VERSION        := 0.2.86
 
 # ---------------------------------------------------------------------------
 # Project constants
@@ -19,8 +20,8 @@ SEMVER_RE := ^[0-9]+\.[0-9]+\.[0-9]+$$
 # Targets
 # ---------------------------------------------------------------------------
 
-.PHONY: help deps clean lint build test update run post stop stop-dapr stop-apps \
-        kafka-start kafka-stop ci release renovate-bootstrap renovate-validate
+.PHONY: help deps deps-act clean lint build test update run post stop stop-dapr stop-apps \
+        kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
 
 #help: @ List available tasks
 help:
@@ -36,17 +37,23 @@ deps:
 	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed"; exit 1; }
 	@echo "All required tools are available."
 
+#deps-act: @ Install act for local CI
+deps-act: deps
+	@command -v act >/dev/null 2>&1 || { echo "Installing act $(ACT_VERSION)..."; \
+		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
+	}
+
 #clean: @ Remove build artifacts
 clean:
 	@dotnet clean $(SOLUTION) --verbosity quiet
 	@echo "Clean complete."
 
 #lint: @ Run dotnet format to check code style
-lint:
+lint: deps
 	@dotnet format $(SOLUTION) --verify-no-changes --verbosity diagnostic
 
 #build: @ Restore and build entire solution
-build:
+build: deps
 	@dotnet restore $(SOLUTION)
 	@dotnet build $(SOLUTION)
 
@@ -106,8 +113,13 @@ kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
 #ci: @ Run full CI pipeline (lint, build, test)
-ci: lint build test
+ci: deps lint build test
 	@echo "CI pipeline passed."
+
+#ci-run: @ Run GitHub Actions workflow locally using act
+ci-run: deps-act
+	@act push --container-architecture linux/amd64 \
+		--artifact-server-path /tmp/act-artifacts
 
 #release: @ Create a release tag (usage: make release VERSION=1.0.0)
 release:
