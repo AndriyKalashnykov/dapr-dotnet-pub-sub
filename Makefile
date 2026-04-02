@@ -7,7 +7,7 @@ DOTNET_VERSION     := 10.0
 DAPR_VERSION       := 1.16.1
 DOCKER_MIN_VERSION := 20.10
 NVM_VERSION        := 0.40.4
-ACT_VERSION        := 0.2.86
+ACT_VERSION        := 0.2.87
 
 # ---------------------------------------------------------------------------
 # Project constants
