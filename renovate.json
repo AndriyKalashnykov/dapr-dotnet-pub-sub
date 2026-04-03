@@ -92,8 +92,8 @@
     {
       "customType": "regex",
       "description": "Track act version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
+      "managerFilePatterns": [
+        "/^Makefile$/"
       ],
       "matchStrings": [
         "ACT_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
@@ -105,8 +105,8 @@
     {
       "customType": "regex",
       "description": "Track nvm version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
+      "managerFilePatterns": [
+        "/^Makefile$/"
       ],
       "matchStrings": [
         "NVM_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
