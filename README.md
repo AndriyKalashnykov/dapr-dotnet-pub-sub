@@ -1,4 +1,4 @@
-[![ci](https://github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/actions/workflows/ci.yml)
+[![CI](https://github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/actions/workflows/ci.yml)
 [![Hits](https://hits.sh/github.com/AndriyKalashnykov/dapr-dotnet-pub-sub.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://app.renovatebot.com/dashboard#github/AndriyKalashnykov/dapr-dotnet-pub-sub)
@@ -42,6 +42,7 @@ make run          # build and run both apps via Dapr
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
 | [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.16+ | Sidecar-based pub/sub |
+| [curl](https://curl.se/) | 7.0+ | Send HTTP requests to APIs |
 
 Install all required dependencies:
 
@@ -182,10 +183,14 @@ dapr stop --app-id producer
 
 ## CI/CD
 
-GitHub Actions runs on every push to `main`, tags `v*`, and pull requests.
+GitHub Actions runs on every push to `main`, tags `v*`, and pull requests. The pipeline enforces code style with `dotnet format`, builds the solution, and runs xUnit tests.
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
-| **ci** | push, PR, tags | Lint, Build, Test |
+| **lint** | push, PR, tags | Code style check via `make lint` |
+| **build** | after lint | Restore and build via `make build` |
+| **test** | after lint | Run xUnit tests via `make test` |
+
+Build and test run in parallel after lint passes (fail-fast).
 
 [Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with platform automerge enabled.

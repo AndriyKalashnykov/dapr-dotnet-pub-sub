@@ -56,8 +56,7 @@
         "mcr.microsoft.com/dotnet/runtime-deps"
       ],
       "extends": [
-        ":disableMajorUpdates",
-        ":pinDigestsDisabled"
+        ":disableMajorUpdates"
       ]
     },
     {
@@ -80,6 +79,41 @@
         "docker-compose"
       ],
       "groupName": "Docker images"
+    },
+    {
+      "description": "Group Makefile tool versions into one PR",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "groupName": "Makefile tool versions"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track act version in Makefile",
+      "fileMatch": [
+        "^Makefile$"
+      ],
+      "matchStrings": [
+        "ACT_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
+      ],
+      "depNameTemplate": "nektos/act",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track nvm version in Makefile",
+      "fileMatch": [
+        "^Makefile$"
+      ],
+      "matchStrings": [
+        "NVM_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
+      ],
+      "depNameTemplate": "nvm-sh/nvm",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ]
 }

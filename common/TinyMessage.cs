@@ -13,7 +13,7 @@ public class TinyMessageDto
     {
         Guid id;
         // Clean up potential formatting issues in the ID string
-        string cleanedId = Id?.Trim().TrimEnd('}');
+        string? cleanedId = Id?.Trim().TrimEnd('}');
         if (string.IsNullOrEmpty(cleanedId) || !Guid.TryParse(cleanedId, out id))
         {
             id = Guid.NewGuid(); // Use a fallback if parsing fails

@@ -35,11 +35,12 @@ Build a single project: `dotnet build producer/producer.csproj`
 
 ## Architecture
 
-### Three projects in `dapr-dotnet-pub-sub.sln`:
+### Four projects in `dapr-dotnet-pub-sub.sln`:
 
 - **common/** -- Shared library (`OutputType: Library`). Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic. Referenced by both apps.
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** -- ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
+- **tests/** -- xUnit test project. References common, producer, and consumer projects. Contains unit and integration tests using NSubstitute for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
 
 ### Message routing (declarative subscription)
 
@@ -69,7 +70,7 @@ Kafka stack: Zookeeper (:2181), Kafka (:9092), Kafka UI (:9080), Kafdrop (:9000)
 ## Tech Stack
 
 - .NET 10 (defined in `global.json`, `rollForward: latestFeature`)
-- Dapr SDK: `Dapr.AspNetCore` 1.16.1
+- Dapr SDK: `Dapr.AspNetCore` 1.17.7
 - Kafka as the message broker (Confluent images)
 - CI: GitHub Actions -- lint, build, test (`make lint`, `make build`, `make test`)
 
