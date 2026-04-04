@@ -2,46 +2,55 @@ using System.Net;
 using System.Net.Http.Json;
 using Common;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Xunit;
 
 namespace Tests;
 
-public class ConsumerEndpointTests : IClassFixture<WebApplicationFactory<Consumer.Program>>
+public class ConsumerEndpointTests
 {
-    private readonly HttpClient _client;
+    private static WebApplicationFactory<Consumer.Program> _factory = null!;
+    private static HttpClient _client = null!;
 
-    public ConsumerEndpointTests(WebApplicationFactory<Consumer.Program> factory)
+    [Before(Class)]
+    public static void Setup()
     {
-        _client = factory.CreateClient();
+        _factory = new WebApplicationFactory<Consumer.Program>();
+        _client = _factory.CreateClient();
     }
 
-    [Fact]
+    [After(Class)]
+    public static async Task Cleanup()
+    {
+        _client.Dispose();
+        await _factory.DisposeAsync();
+    }
+
+    [Test]
     public async Task PostHandleType1_WithValidMessage_Returns202()
     {
         var message = new TinyMessage(Guid.NewGuid(), DateTimeOffset.UtcNow, "1");
 
         var response = await _client.PostAsJsonAsync("/handletype1", message);
 
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
 
-    [Fact]
+    [Test]
     public async Task PostHandleType2_WithValidMessage_Returns202()
     {
         var message = new TinyMessage(Guid.NewGuid(), DateTimeOffset.UtcNow, "2");
 
         var response = await _client.PostAsJsonAsync("/handletype2", message);
 
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
 
-    [Fact]
+    [Test]
     public async Task PostDefaultMessageHandler_WithValidMessage_Returns202()
     {
         var message = new TinyMessage(Guid.NewGuid(), DateTimeOffset.UtcNow, "0");
 
         var response = await _client.PostAsJsonAsync("/dafault-messagehandler", message);
 
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
 }

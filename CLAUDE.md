@@ -10,12 +10,14 @@ Dapr pub/sub demo with two .NET 10 microservices communicating via Kafka through
 
 ```bash
 make help           # List available tasks
-make deps           # Check required tool dependencies (dotnet, docker, dapr)
+make deps           # Check required tool dependencies (dotnet)
+make deps-run       # Check runtime dependencies (dotnet, docker, dapr)
 make deps-act       # Install act for local CI
 make clean          # Remove build artifacts
+make format         # Auto-fix code formatting
 make lint           # Run dotnet format to check code style
 make build          # Restore + build entire solution
-make test           # Run all tests (depends on build)
+make test           # Run all tests (depends on deps)
 make update         # Update NuGet packages to latest versions
 make run            # Build, stop previous, then run both apps via `dapr run -f .`
 make post           # Send test messages to producer (multiple types)
@@ -24,7 +26,7 @@ make stop-dapr      # Stop Dapr multi-app run
 make stop-apps      # Kill processes running on known ports
 make kafka-start    # Start Kafka stack (Zookeeper, Kafka, Kafka UI, Kafdrop)
 make kafka-stop     # Stop Kafka stack
-make ci             # Run full CI pipeline (lint, build, test)
+make ci             # Run full CI pipeline (lint, test, build, deps-prune-check)
 make ci-run         # Run GitHub Actions workflow locally using act
 make release VERSION=X.Y.Z  # Create a semver-validated release tag
 make renovate-bootstrap      # Install nvm and npm for Renovate
@@ -40,7 +42,7 @@ Build a single project: `dotnet build producer/producer.csproj`
 - **common/** -- Shared library (`OutputType: Library`). Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic. Referenced by both apps.
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** -- ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
-- **tests/** -- xUnit test project. References common, producer, and consumer projects. Contains unit and integration tests using NSubstitute for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
+- **tests/** -- TUnit test project. References common, producer, and consumer projects. Contains unit and integration tests using NSubstitute for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
 
 ### Message routing (declarative subscription)
 
@@ -53,6 +55,7 @@ Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
 
 - `kafka.yaml` -- Kafka pubsub component (`message-pubsub-kafka`), broker at `localhost:9092`, scoped to producer + consumer
 - `subscription.yaml` -- Declarative subscription with content-based routing rules
+- `dapr.yaml` -- Dapr configuration (tracing, metrics)
 - `redis-pubsub.yaml` -- Redis pubsub component (unused, kept as alternative)
 - `dapr.yaml` -- Multi-app run template in project root (not in components/)
 

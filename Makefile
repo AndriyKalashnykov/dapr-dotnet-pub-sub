@@ -8,6 +8,7 @@ DAPR_VERSION       := 1.17.7
 DOCKER_MIN_VERSION := 20.10
 NVM_VERSION        := 0.40.4
 ACT_VERSION        := 0.2.87
+NODE_VERSION       := 24
 
 # ---------------------------------------------------------------------------
 # Project constants
@@ -15,8 +16,8 @@ ACT_VERSION        := 0.2.87
 APP_NAME   := dapr-dotnet-pub-sub
 CURRENTTAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 SOLUTION   := dapr-dotnet-pub-sub.sln
-PORTS    := "3530,3531,3532,5230,5231,5232,7006,7007"
-SEMVER_RE := ^[0-9]+\.[0-9]+\.[0-9]+$$
+PORTS      := 3530 3531 3532 5230 5231 5232 7006 7007
+SEMVER_RE  := ^[0-9]+\.[0-9]+\.[0-9]+$$
 
 # ---------------------------------------------------------------------------
 # Targets
@@ -24,30 +25,38 @@ SEMVER_RE := ^[0-9]+\.[0-9]+\.[0-9]+$$
 
 #help: @ List available tasks
 help:
-	@clear
 	@echo "Usage: make COMMAND"
 	@echo "Commands :"
 	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#' | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[32m%-20s\033[0m - %s\n", $$1, $$2}'
 
-#deps: @ Check required tool dependencies
+#deps: @ Check required tool dependencies (dotnet)
 deps:
 	@command -v dotnet >/dev/null 2>&1 || { echo "ERROR: dotnet is not installed (need $(DOTNET_VERSION)+)"; exit 1; }
 
 #deps-run: @ Check runtime dependencies (dotnet, docker, dapr)
 deps-run: deps
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed (need $(DOCKER_MIN_VERSION)+)"; exit 1; }
-	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed"; exit 1; }
+	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (need $(DAPR_VERSION)+)"; exit 1; }
 
 #deps-act: @ Install act for local CI
-deps-act:
-	@command -v dotnet >/dev/null 2>&1 || { echo "ERROR: dotnet is not installed (need $(DOTNET_VERSION)+)"; exit 1; }
+deps-act: deps
 	@command -v act >/dev/null 2>&1 || { echo "Installing act $(ACT_VERSION)..."; \
 		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
 	}
 
+#deps-prune-check: @ Verify no redundant NuGet package references
+deps-prune-check: deps
+	@echo "Checking for redundant package references..."
+	@if dotnet build $(SOLUTION) --nologo -v q 2>&1 | grep -qE 'NU1510|NU1504'; then \
+		echo "ERROR: Redundant or duplicate package references found:"; \
+		dotnet build $(SOLUTION) --nologo -v q 2>&1 | grep -E 'NU1510|NU1504'; \
+		exit 1; \
+	fi
+
 #clean: @ Remove build artifacts
 clean:
 	@dotnet clean $(SOLUTION) --verbosity quiet
+	@find . -type d \( -name bin -o -name obj \) -exec rm -rf {} + 2>/dev/null || true
 	@echo "Clean complete."
 
 #format: @ Auto-fix code formatting
@@ -64,13 +73,15 @@ build: deps
 	@dotnet build $(SOLUTION)
 
 #test: @ Run all tests
-test: build
-	@dotnet test $(SOLUTION) --no-build
+test: deps
+	@dotnet run --project tests/tests.csproj
 
 #update: @ Update NuGet packages to latest versions
-update: build test
+update: deps
+	@cd common   && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
 	@cd consumer && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
 	@cd producer && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
+	@cd tests    && dotnet list package --outdated | grep -o '> \S*' | grep '[^> ]*' -o | xargs --no-run-if-empty -L 1 dotnet add package
 
 #run: @ Build, stop previous, and run both apps via Dapr
 run: deps-run build stop
@@ -119,7 +130,7 @@ kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
 #ci: @ Run full CI pipeline (lint, build, test)
-ci: deps lint build test
+ci: deps lint test build deps-prune-check
 	@echo "CI pipeline passed."
 
 #ci-run: @ Run GitHub Actions workflow locally using act
@@ -144,12 +155,12 @@ renovate-bootstrap:
 		curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$(NVM_VERSION)/install.sh | bash; \
 		export NVM_DIR="$$HOME/.nvm"; \
 		[ -s "$$NVM_DIR/nvm.sh" ] && . "$$NVM_DIR/nvm.sh"; \
-		nvm install --lts; \
+		nvm install $(NODE_VERSION); \
 	}
 
 #renovate-validate: @ Validate Renovate configuration
 renovate-validate: renovate-bootstrap
 	@npx --yes renovate --platform=local
 
-.PHONY: help deps deps-run deps-act clean format lint build test update run post stop stop-dapr stop-apps \
-        kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+.PHONY: help deps deps-run deps-act deps-prune-check clean format lint build test update run post \
+        stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

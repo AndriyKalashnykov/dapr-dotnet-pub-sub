@@ -1,37 +1,44 @@
 using System.Net;
-using System.Net.Http.Json;
-using Common;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Xunit;
 
 namespace Tests;
 
-public class ProducerEndpointTests : IClassFixture<WebApplicationFactory<Producer.Program>>
+public class ProducerEndpointTests
 {
-    private readonly HttpClient _client;
+    private static WebApplicationFactory<Producer.Program> _factory = null!;
+    private static HttpClient _client = null!;
 
-    public ProducerEndpointTests(WebApplicationFactory<Producer.Program> factory)
+    [Before(Class)]
+    public static void Setup()
     {
-        _client = factory.CreateClient();
+        _factory = new WebApplicationFactory<Producer.Program>();
+        _client = _factory.CreateClient();
     }
 
-    [Fact]
+    [After(Class)]
+    public static async Task Cleanup()
+    {
+        _client.Dispose();
+        await _factory.DisposeAsync();
+    }
+
+    [Test]
     public async Task GetDaprConfig_Returns200WithEmptyJson()
     {
         var response = await _client.GetAsync("/dapr/config");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Equal("{}", content);
+        await Assert.That(content).IsEqualTo("{}");
     }
 
-    [Fact]
+    [Test]
     public async Task GetDaprSubscribe_Returns200WithEmptyArray()
     {
         var response = await _client.GetAsync("/dapr/subscribe");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Equal("[]", content);
+        await Assert.That(content).IsEqualTo("[]");
     }
 }

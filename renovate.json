@@ -56,14 +56,15 @@
         "mcr.microsoft.com/dotnet/runtime-deps"
       ],
       "extends": [
-        ":disableMajorUpdates"
+        ":disableMajorUpdates",
+        ":pinDigestsDisabled"
       ]
     },
     {
-      "description": "Group XUnit test dependencies",
-      "groupName": "XUnit",
+      "description": "Group TUnit test dependencies",
+      "groupName": "TUnit",
       "matchPackageNames": [
-        "/^xunit/"
+        "/^TUnit/"
       ]
     },
     {

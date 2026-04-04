@@ -4,30 +4,15 @@
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://app.renovatebot.com/dashboard#github/AndriyKalashnykov/dapr-dotnet-pub-sub)
 # Dapr DotNet pub/sub
 
-In this quickstart, you'll create a publisher microservice and a subscriber microservice to demonstrate how Dapr enables
-a publish-subcribe pattern. The publisher will generate messages of a specific topic, while subscribers will listen for
-messages of specific topics.
-See [Why Pub-Sub](https://docs.dapr.io/developing-applications/building-blocks/pubsub/pubsub-overview/) to understand
-when this pattern might be a good choice for your software architecture.
+Dapr publish-subscribe demo with two .NET 10 microservices communicating via Kafka through the Dapr sidecar. The **producer** publishes `TinyMessage` events to a Kafka topic; the **consumer** receives them via Dapr's declarative subscription with content-based routing.
 
 Visit [this](https://docs.dapr.io/developing-applications/building-blocks/pubsub/) link for more information about Dapr
 and Pub-Sub.
 
-> **Note:** This example leverages the Dapr client SDK. If you are looking for the example using only
-> HTTP [click here](../http).
-
-This quickstart includes one publisher:
-
-- Dotnet client message generator `producer`
-
-And one subscriber:
-
-- Dotnet subscriber `consumer`
-
 ## Quick Start
 
 ```bash
-make deps         # verify required tools (dotnet, docker, dapr)
+make deps         # verify required tools (dotnet)
 make build        # restore and build the solution
 make test         # run all tests
 make kafka-start  # start Kafka stack (in a separate terminal)
@@ -39,10 +24,11 @@ make run          # build and run both apps via Dapr
 | Tool | Version | Purpose |
 |------|---------|---------|
 | [GNU Make](https://www.gnu.org/software/make/) | 3.81+ | Build orchestration |
+| [Git](https://git-scm.com/) | 2.0+ | Version control |
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.16+ | Sidecar-based pub/sub |
-| [curl](https://curl.se/) | 7.0+ | Send HTTP requests to APIs |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17+ | Sidecar-based pub/sub |
+| [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
 Install all required dependencies:
 
@@ -61,6 +47,7 @@ Run `make help` to see all available targets.
 | `make build` | Restore and build entire solution |
 | `make test` | Run all tests |
 | `make lint` | Run dotnet format to check code style |
+| `make format` | Auto-fix code formatting |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
 | `make post` | Send test messages to producer |
@@ -87,12 +74,16 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
-| `make deps` | Check required tool dependencies |
+| `make help` | List available tasks |
+| `make deps` | Check required tool dependencies (dotnet) |
+| `make deps-run` | Check runtime dependencies (dotnet, docker, dapr) |
+| `make deps-act` | Install act for local CI |
+| `make deps-prune-check` | Verify no redundant NuGet package references |
 | `make release VERSION=X.Y.Z` | Create a semver-validated release tag |
 | `make renovate-bootstrap` | Install nvm and npm for Renovate |
 | `make renovate-validate` | Validate Renovate configuration |
 
-## Run all apps with multi-app run template file:
+## Run all apps with multi-app run template file
 
 This section shows how to run both applications at once
 using [multi-app run template files](https://docs.dapr.io/developing-applications/local-development/multi-app-dapr-run/multi-app-overview/)
@@ -120,7 +111,7 @@ The terminal console output should look similar to this:
 
 ```text
 == APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
-== APP - producer ==       Request starting HTTP/1.1 POST http://localhost:5231/send - application/json 67
+== APP - producer ==       Request starting HTTP/1.1 POST http://localhost:5232/send - application/json 67
 == APP - producer == Received request body: {
 == APP - producer ==     "id": "{{$guid}}",
 == APP - producer ==     "timeStamp": "{{$datetime iso8601}}"
@@ -139,7 +130,7 @@ The terminal console output should look similar to this:
 == APP - producer == info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
 == APP - producer ==       Executed endpoint 'HTTP: POST /send'
 == APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
-== APP - producer ==       Request finished HTTP/1.1 POST http://localhost:5231/send - 202 - application/json;+charset=utf-8 191.3736ms
+== APP - producer ==       Request finished HTTP/1.1 POST http://localhost:5232/send - 202 - application/json;+charset=utf-8 191.3736ms
 == APP - consumer == Received message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
 ...
 ```
@@ -162,7 +153,7 @@ An alternative to running all or multiple applications at once is to run single 
 
 ```bash
 cd ./consumer
-dapr run --app-id consumer --app-port 5230 --components-path ../components dotnet run
+dapr run --app-id consumer --app-port 5231 --components-path ../components dotnet run
 ```
 
 ### Run Dotnet message publisher with Dapr
@@ -171,7 +162,7 @@ dapr run --app-id consumer --app-port 5230 --components-path ../components dotne
 
 ```bash
 cd ./producer
-dapr run --app-id producer --app-port 5231 --components-path ../components dotnet run
+dapr run --app-id producer --app-port 5232 --components-path ../components dotnet run
 ```
 
 2. Stop and clean up application processes
@@ -183,14 +174,16 @@ dapr stop --app-id producer
 
 ## CI/CD
 
-GitHub Actions runs on every push to `main`, tags `v*`, and pull requests. The pipeline enforces code style with `dotnet format`, builds the solution, and runs xUnit tests.
+GitHub Actions runs on every push to `main`, tags `v*`, and pull requests. The pipeline enforces code style with `dotnet format`, builds the solution, and runs TUnit tests.
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
 | **lint** | push, PR, tags | Code style check via `make lint` |
 | **build** | after lint | Restore and build via `make build` |
-| **test** | after lint | Run xUnit tests via `make test` |
+| **test** | after lint | Run TUnit tests via `make test` |
 
 Build and test run in parallel after lint passes (fail-fast).
+
+The `Cleanup old workflow runs` workflow runs weekly to delete runs older than 7 days.
 
 [Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with platform automerge enabled.

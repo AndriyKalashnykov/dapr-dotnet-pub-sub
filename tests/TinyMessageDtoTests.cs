@@ -1,12 +1,11 @@
 using Common;
-using Xunit;
 
 namespace Tests;
 
 public class TinyMessageDtoTests
 {
-    [Fact]
-    public void ToMessage_ValidGuidAndTimestamp_ReturnsCorrectMessage()
+    [Test]
+    public async Task ToMessage_ValidGuidAndTimestamp_ReturnsCorrectMessage()
     {
         var dto = new TinyMessageDto
         {
@@ -17,13 +16,13 @@ public class TinyMessageDtoTests
 
         var message = dto.ToMessage();
 
-        Assert.Equal(Guid.Parse("e9cdd036-c529-4bf9-bd59-d7148ef9237d"), message.Id);
-        Assert.Equal(new DateTime(2025, 9, 26, 2, 52, 4, 835, DateTimeKind.Utc), message.TimeStamp.UtcDateTime);
-        Assert.Equal("1", message.Type);
+        await Assert.That(message.Id).IsEqualTo(Guid.Parse("e9cdd036-c529-4bf9-bd59-d7148ef9237d"));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsEqualTo(new DateTime(2025, 9, 26, 2, 52, 4, 835, DateTimeKind.Utc));
+        await Assert.That(message.Type).IsEqualTo("1");
     }
 
-    [Fact]
-    public void ToMessage_InvalidGuid_GeneratesNewGuid()
+    [Test]
+    public async Task ToMessage_InvalidGuid_GeneratesNewGuid()
     {
         var dto = new TinyMessageDto
         {
@@ -34,11 +33,11 @@ public class TinyMessageDtoTests
 
         var message = dto.ToMessage();
 
-        Assert.NotEqual(Guid.Empty, message.Id);
+        await Assert.That(message.Id).IsNotEqualTo(Guid.Empty);
     }
 
-    [Fact]
-    public void ToMessage_EmptyGuid_GeneratesNewGuid()
+    [Test]
+    public async Task ToMessage_EmptyGuid_GeneratesNewGuid()
     {
         var dto = new TinyMessageDto
         {
@@ -49,11 +48,11 @@ public class TinyMessageDtoTests
 
         var message = dto.ToMessage();
 
-        Assert.NotEqual(Guid.Empty, message.Id);
+        await Assert.That(message.Id).IsNotEqualTo(Guid.Empty);
     }
 
-    [Fact]
-    public void ToMessage_GuidWithTrailingBrace_CleansAndParses()
+    [Test]
+    public async Task ToMessage_GuidWithTrailingBrace_CleansAndParses()
     {
         var dto = new TinyMessageDto
         {
@@ -64,11 +63,11 @@ public class TinyMessageDtoTests
 
         var message = dto.ToMessage();
 
-        Assert.Equal(Guid.Parse("e9cdd036-c529-4bf9-bd59-d7148ef9237d"), message.Id);
+        await Assert.That(message.Id).IsEqualTo(Guid.Parse("e9cdd036-c529-4bf9-bd59-d7148ef9237d"));
     }
 
-    [Fact]
-    public void ToMessage_InvalidTimestamp_FallsBackToUtcNow()
+    [Test]
+    public async Task ToMessage_InvalidTimestamp_FallsBackToUtcNow()
     {
         var before = DateTime.UtcNow;
 
@@ -82,11 +81,12 @@ public class TinyMessageDtoTests
         var message = dto.ToMessage();
         var after = DateTime.UtcNow;
 
-        Assert.InRange(message.TimeStamp.UtcDateTime, before.AddSeconds(-1), after.AddSeconds(1));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsGreaterThanOrEqualTo(before.AddSeconds(-1));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsLessThanOrEqualTo(after.AddSeconds(1));
     }
 
-    [Fact]
-    public void ToMessage_EmptyTimestamp_FallsBackToUtcNow()
+    [Test]
+    public async Task ToMessage_EmptyTimestamp_FallsBackToUtcNow()
     {
         var before = DateTime.UtcNow;
 
@@ -100,11 +100,12 @@ public class TinyMessageDtoTests
         var message = dto.ToMessage();
         var after = DateTime.UtcNow;
 
-        Assert.InRange(message.TimeStamp.UtcDateTime, before.AddSeconds(-1), after.AddSeconds(1));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsGreaterThanOrEqualTo(before.AddSeconds(-1));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsLessThanOrEqualTo(after.AddSeconds(1));
     }
 
-    [Fact]
-    public void ToMessage_TypeFieldPassesThroughAsIs()
+    [Test]
+    public async Task ToMessage_TypeFieldPassesThroughAsIs()
     {
         var dto = new TinyMessageDto
         {
@@ -115,11 +116,11 @@ public class TinyMessageDtoTests
 
         var message = dto.ToMessage();
 
-        Assert.Equal("custom-type", message.Type);
+        await Assert.That(message.Type).IsEqualTo("custom-type");
     }
 
-    [Fact]
-    public void ToMessage_DefaultDto_ReturnsValidMessageWithGeneratedIdAndCurrentTime()
+    [Test]
+    public async Task ToMessage_DefaultDto_ReturnsValidMessageWithGeneratedIdAndCurrentTime()
     {
         var before = DateTime.UtcNow;
 
@@ -128,8 +129,9 @@ public class TinyMessageDtoTests
         var message = dto.ToMessage();
         var after = DateTime.UtcNow;
 
-        Assert.NotEqual(Guid.Empty, message.Id);
-        Assert.InRange(message.TimeStamp.UtcDateTime, before.AddSeconds(-1), after.AddSeconds(1));
-        Assert.Equal(string.Empty, message.Type);
+        await Assert.That(message.Id).IsNotEqualTo(Guid.Empty);
+        await Assert.That(message.TimeStamp.UtcDateTime).IsGreaterThanOrEqualTo(before.AddSeconds(-1));
+        await Assert.That(message.TimeStamp.UtcDateTime).IsLessThanOrEqualTo(after.AddSeconds(1));
+        await Assert.That(message.Type).IsEqualTo(string.Empty);
     }
 }
