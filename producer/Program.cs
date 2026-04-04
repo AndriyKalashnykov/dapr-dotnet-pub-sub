@@ -1,8 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
 using Dapr.Client;
-// Replace PubSub.Common with the correct namespace
-// Looking at your project structure, this is likely just "Common"
 using Common;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,7 +15,7 @@ builder.WebHost.UseUrls($"http://*:{port}");
 var app = builder.Build();
 
 const string PubSubComponentName = "message-pubsub-kafka";
-const string TopicName = "incoming-messages";  // Changed from "orders" to match subscription.yaml
+const string TopicName = "incoming-messages";
 
 // Dummy endpoint for /dapr/config to avoid 404 log noise
 app.MapGet("/dapr/config", () => Results.Json(new { }));
@@ -112,14 +110,3 @@ app.MapPost("/sendasbytes", async (
 app.Run();
 
 namespace Producer { public partial class Program { } }
-
-// for (int i = 1; i <= 100; i++) {
-//     var order = new Order(i);
-//     using var client = new DaprClientBuilder().Build();
-//
-//     // Publish an event/message using Dapr PubSub
-//     await client.PublishEventAsync("message-pubsub-kafka", "orders", order);
-//     Console.WriteLine(" sent: " + order);
-//
-//     await Task.Delay(TimeSpan.FromSeconds(1));
-// }
