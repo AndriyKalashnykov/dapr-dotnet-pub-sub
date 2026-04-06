@@ -4,7 +4,7 @@
 # Tool versions
 # ---------------------------------------------------------------------------
 DOTNET_VERSION     := 10.0
-DAPR_VERSION       := 1.17.7
+DAPR_CLI_VERSION   := 1.17.0
 DOCKER_MIN_VERSION := 20.10
 NVM_VERSION        := 0.40.4
 ACT_VERSION        := 0.2.87
@@ -15,7 +15,7 @@ NODE_VERSION       := 24
 # ---------------------------------------------------------------------------
 APP_NAME   := dapr-dotnet-pub-sub
 CURRENTTAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
-SOLUTION   := dapr-dotnet-pub-sub.sln
+SOLUTION   := dapr-dotnet-pub-sub.slnx
 PORTS      := 3530 3531 3532 5230 5231 5232 7006 7007
 SEMVER_RE  := ^[0-9]+\.[0-9]+\.[0-9]+$$
 
@@ -36,7 +36,7 @@ deps:
 #deps-run: @ Check runtime dependencies (dotnet, docker, dapr)
 deps-run: deps
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed (need $(DOCKER_MIN_VERSION)+)"; exit 1; }
-	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (need $(DAPR_VERSION)+)"; exit 1; }
+	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (need $(DAPR_CLI_VERSION)+)"; exit 1; }
 
 #deps-act: @ Install act for local CI
 deps-act: deps

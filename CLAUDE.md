@@ -39,7 +39,7 @@ Build a single project: `dotnet build producer/producer.csproj`
 
 ## Architecture
 
-### Four projects in `dapr-dotnet-pub-sub.sln`:
+### Four projects in `dapr-dotnet-pub-sub.slnx`:
 
 - **common/** -- Shared library (`OutputType: Library`). Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic. Referenced by both apps.
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
@@ -58,7 +58,6 @@ Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
 - `kafka.yaml` -- Kafka pubsub component (`message-pubsub-kafka`), broker at `localhost:9092`, scoped to producer + consumer
 - `subscription.yaml` -- Declarative subscription with content-based routing rules
 - `dapr.yaml` -- Dapr configuration (tracing, metrics)
-- `redis-pubsub.yaml` -- Redis pubsub component (unused, kept as alternative)
 - `dapr.yaml` -- Multi-app run template in project root (not in components/)
 
 ### Port assignments
@@ -78,6 +77,11 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Dapr SDK: `Dapr.AspNetCore` 1.17.7
 - Kafka as the message broker (Confluent images)
 - CI: GitHub Actions -- static-check, test, build (`make lint`, `make test`, `make build`)
+
+## Upgrade Backlog
+
+- [ ] Monitor NSubstitute for .NET 11 compatibility — last release Oct 2024, repo active but slow cadence
+- [ ] TUnit daily releases generate frequent Renovate PRs — grouped under `TUnit` package rule; review if PR volume becomes disruptive
 
 ## Skills
 

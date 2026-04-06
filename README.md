@@ -27,7 +27,7 @@ make run          # build and run both apps via Dapr
 | [Git](https://git-scm.com/) | 2.0+ | Version control |
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.7+ | Sidecar-based pub/sub |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.0+ | Sidecar-based pub/sub |
 | [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
 Install all required dependencies:

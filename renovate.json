@@ -147,7 +147,7 @@
         "^Makefile$"
       ],
       "matchStrings": [
-        "DAPR_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
+        "DAPR_CLI_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
       ],
       "depNameTemplate": "dapr/cli",
       "datasourceTemplate": "github-releases",
