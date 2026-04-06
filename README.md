@@ -15,7 +15,7 @@ and Pub-Sub.
 make deps         # verify required tools (dotnet)
 make build        # restore and build the solution
 make test         # run all tests
-make kafka-start  # start Kafka stack (in a separate terminal)
+make kafka-start  # start Kafka in KRaft mode (in a separate terminal)
 make run          # build and run both apps via Dapr
 ```
 
@@ -27,7 +27,7 @@ make run          # build and run both apps via Dapr
 | [Git](https://git-scm.com/) | 2.0+ | Version control |
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17+ | Sidecar-based pub/sub |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.7+ | Sidecar-based pub/sub |
 | [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
 Install all required dependencies:
@@ -46,7 +46,7 @@ Run `make help` to see all available targets.
 |--------|-------------|
 | `make build` | Restore and build entire solution |
 | `make test` | Run all tests |
-| `make lint` | Run dotnet format to check code style |
+| `make lint` | Check code style and compiler warnings |
 | `make format` | Auto-fix code formatting |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
@@ -63,11 +63,19 @@ Run `make help` to see all available targets.
 | `make stop-dapr` | Stop Dapr multi-app run |
 | `make stop-apps` | Kill processes running on known ports |
 
+### Code Quality
+
+| Target | Description |
+|--------|-------------|
+| `make vulncheck` | Check for vulnerable NuGet packages |
+| `make deps-prune` | Show redundant NuGet package references |
+| `make deps-prune-check` | Verify no redundant NuGet package references |
+
 ### CI
 
 | Target | Description |
 |--------|-------------|
-| `make ci` | Run full CI pipeline (lint, build, test) |
+| `make ci` | Run full CI pipeline (lint, test, build, deps-prune-check) |
 | `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) |
 
 ### Utilities
@@ -78,8 +86,7 @@ Run `make help` to see all available targets.
 | `make deps` | Check required tool dependencies (dotnet) |
 | `make deps-run` | Check runtime dependencies (dotnet, docker, dapr) |
 | `make deps-act` | Install act for local CI |
-| `make deps-prune-check` | Verify no redundant NuGet package references |
-| `make release VERSION=X.Y.Z` | Create a semver-validated release tag |
+| `make release VERSION=X.Y.Z` | Create a release tag (usage: make release VERSION=1.0.0) |
 | `make renovate-bootstrap` | Install nvm and npm for Renovate |
 | `make renovate-validate` | Validate Renovate configuration |
 
@@ -96,7 +103,7 @@ make kafka-start
 ```
 
 
-2. Open a new terminal window consumer and producer:
+2. Open a new terminal window and run consumer and producer:
 
 ```bash
 make run
@@ -113,25 +120,23 @@ The terminal console output should look similar to this:
 == APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
 == APP - producer ==       Request starting HTTP/1.1 POST http://localhost:5232/send - application/json 67
 == APP - producer == Received request body: {
-== APP - producer ==     "id": "{{$guid}}",
-== APP - producer ==     "timeStamp": "{{$datetime iso8601}}"
+== APP - producer ==     "id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d",
+== APP - producer ==     "timeStamp": "2025-09-26T02:52:04.835Z",
+== APP - producer ==     "type": "2"
 == APP - producer == }
 == APP - producer == info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
 == APP - producer ==       Executing endpoint 'HTTP: POST /send'
-== APP - producer == Failed to parse ID: {{$guid}}, using generated ID: 17eaeb93-f76a-4fc8-848a-10a668f28458
-== APP - producer == Attempting to parse timestamp value: {{$datetime iso8601}}
-== APP - producer == Failed to parse timestamp: {{$datetime iso8601}}, using current UTC time: 9/28/2025 4:30:14 AM
-== APP - producer == Sent message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
+== APP - producer == Sent message a1cdd036-c529-4bf9-bd59-d7148ef9237d, timestamp: 9/26/2025 2:52:04 AM +00:00
 == APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[1]
 == APP - producer ==       Setting HTTP status code 202.
 == APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[3]
 == APP - producer ==       Writing value of type 'Guid' as Json.
-== APP - consumer == Request received: POST /messagehandler
+== APP - consumer == Request received: POST /handletype2
 == APP - producer == info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
 == APP - producer ==       Executed endpoint 'HTTP: POST /send'
 == APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
 == APP - producer ==       Request finished HTTP/1.1 POST http://localhost:5232/send - 202 - application/json;+charset=utf-8 191.3736ms
-== APP - consumer == Received message 17eaeb93-f76a-4fc8-848a-10a668f28458, timestamp: 9/28/2025 4:30:14 AM +00:00
+== APP - consumer == Received message a1cdd036-c529-4bf9-bd59-d7148ef9237d, timestamp: 9/26/2025 2:52:04 AM +00:00
 ...
 ```
 
@@ -178,11 +183,11 @@ GitHub Actions runs on every push to `main`, tags `v*`, and pull requests. The p
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
-| **lint** | push, PR, tags | Code style check via `make lint` |
-| **build** | after lint | Restore and build via `make build` |
-| **test** | after lint | Run TUnit tests via `make test` |
+| **static-check** | push, PR, tags | Code style and compiler warnings via `make lint` |
+| **test** | after static-check | Run TUnit tests via `make test` |
+| **build** | after static-check | Restore and build via `make build`, verify no redundant packages |
 
-Build and test run in parallel after lint passes (fail-fast).
+Test and build run in parallel after static-check passes (fail-fast).
 
 The `Cleanup old workflow runs` workflow runs weekly to delete runs older than 7 days.
 

@@ -15,7 +15,7 @@ make deps-run       # Check runtime dependencies (dotnet, docker, dapr)
 make deps-act       # Install act for local CI
 make clean          # Remove build artifacts
 make format         # Auto-fix code formatting
-make lint           # Run dotnet format to check code style
+make lint           # Check code style and compiler warnings
 make build          # Restore + build entire solution
 make test           # Run all tests (depends on deps)
 make update         # Update NuGet packages to latest versions
@@ -24,8 +24,10 @@ make post           # Send test messages to producer (multiple types)
 make stop           # Stop Dapr + kill processes on known ports
 make stop-dapr      # Stop Dapr multi-app run
 make stop-apps      # Kill processes running on known ports
-make kafka-start    # Start Kafka stack (Zookeeper, Kafka, Kafka UI, Kafdrop)
+make kafka-start    # Start Kafka stack (KRaft mode, Kafka UI)
 make kafka-stop     # Stop Kafka stack
+make vulncheck      # Check for vulnerable NuGet packages
+make deps-prune     # Show redundant NuGet package references
 make ci             # Run full CI pipeline (lint, test, build, deps-prune-check)
 make ci-run         # Run GitHub Actions workflow locally using act
 make release VERSION=X.Y.Z  # Create a semver-validated release tag
@@ -68,14 +70,14 @@ Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
 
 ### Infrastructure (docker-compose-kafka.yml)
 
-Kafka stack: Zookeeper (:2181), Kafka (:9092), Kafka UI (:9080), Kafdrop (:9000).
+Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 
 ## Tech Stack
 
 - .NET 10 (defined in `global.json`, `rollForward: latestFeature`)
 - Dapr SDK: `Dapr.AspNetCore` 1.17.7
 - Kafka as the message broker (Confluent images)
-- CI: GitHub Actions -- lint, build, test (`make lint`, `make build`, `make test`)
+- CI: GitHub Actions -- static-check, test, build (`make lint`, `make test`, `make build`)
 
 ## Skills
 

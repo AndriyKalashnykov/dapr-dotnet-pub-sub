@@ -1,24 +1,23 @@
 version: 1
 common:
-  resourcesPath: components
+  resourcesPaths:
+    - components
   appLogDestination: fileAndConsole
   daprdLogDestination: fileAndConsole
   env:
-    DEBUG: "true" # Common environment variable for all apps
+    DEBUG: "true"
 apps:
   # Producer app: publishes messages to Kafka
   - appID: producer
     appDirPath: producer
     appPort: 5232
-    dapr:
-      appPort: 3532
-      logLevel: "warn"
+    daprHTTPPort: 3532
+    logLevel: "warn"
     command: [ "dotnet", "run" ]
   # Consumer app: subscribes to messages from Kafka
   - appID: consumer
     appDirPath: consumer
     appPort: 5231
-    dapr:
-      appPort: 3531
-      logLevel: "warn"
+    daprHTTPPort: 3531
+    logLevel: "warn"
     command: [ "dotnet", "run" ]

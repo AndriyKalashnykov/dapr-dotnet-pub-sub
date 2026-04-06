@@ -41,8 +41,15 @@ deps-run: deps
 #deps-act: @ Install act for local CI
 deps-act: deps
 	@command -v act >/dev/null 2>&1 || { echo "Installing act $(ACT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
+		curl -sSfL https://raw.githubusercontent.com/nektos/act/v$(ACT_VERSION)/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
 	}
+
+#deps-prune: @ Show redundant NuGet package references
+deps-prune: deps
+	@echo "=== Dependency Pruning ==="
+	@echo "--- .NET: checking for redundant PackageReferences ---"
+	@dotnet build $(SOLUTION) --nologo -v q 2>&1 | grep -E 'NU1510|NU1504' && echo "  ^^^ Remove these PackageReferences from .csproj files" || echo "  No redundant .NET packages found."
+	@echo "=== Pruning complete ==="
 
 #deps-prune-check: @ Verify no redundant NuGet package references
 deps-prune-check: deps
@@ -63,9 +70,10 @@ clean:
 format: deps
 	@dotnet format $(SOLUTION)
 
-#lint: @ Run dotnet format to check code style
+#lint: @ Check code style and compiler warnings
 lint: deps
 	@dotnet format $(SOLUTION) --verify-no-changes --verbosity diagnostic
+	@dotnet build $(SOLUTION) -warnaserror --nologo -v q
 
 #build: @ Restore and build entire solution
 build: deps
@@ -121,7 +129,7 @@ stop-apps:
 stop: stop-dapr stop-apps
 	@echo "All stopped."
 
-#kafka-start: @ Start Kafka stack
+#kafka-start: @ Start Kafka stack (KRaft mode)
 kafka-start: deps-run
 	@docker compose --file docker-compose-kafka.yml up
 
@@ -129,7 +137,11 @@ kafka-start: deps-run
 kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
-#ci: @ Run full CI pipeline (lint, build, test)
+#vulncheck: @ Check for vulnerable NuGet packages
+vulncheck: deps
+	@dotnet list $(SOLUTION) package --vulnerable --include-transitive 2>&1 | tee /dev/stderr | grep -q 'has the following vulnerable packages' && exit 1 || true
+
+#ci: @ Run full CI pipeline (lint, test, build, deps-prune-check)
 ci: deps lint test build deps-prune-check
 	@echo "CI pipeline passed."
 
@@ -162,5 +174,6 @@ renovate-bootstrap:
 renovate-validate: renovate-bootstrap
 	@npx --yes renovate --platform=local
 
-.PHONY: help deps deps-run deps-act deps-prune-check clean format lint build test update run post \
-        stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+.PHONY: help deps deps-run deps-act deps-prune deps-prune-check clean format lint build test update \
+        vulncheck run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release \
+        renovate-bootstrap renovate-validate

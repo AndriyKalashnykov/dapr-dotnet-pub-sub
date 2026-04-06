@@ -9,27 +9,13 @@ spec:
     - name: brokers
       value: "localhost:9092"
     - name: consumerGroup
-      value: "order-group"  # Changed for clarity
+      value: "order-group"
     - name: authType
       value: "none"
-    - name: authRequired
-      value: "false"
     - name: clientID
-      value: "dapr-pubsub-client"  # Changed to be more generic
+      value: "dapr-pubsub-client"
     - name: disableTls
       value: "true"
-    - name: maxRetryCount
-      value: "5"
-    - name: backOffDuration
-      value: "2s"
-    - name: circuitBreaker
-      value: "true"
-    - name: circuitBreakerFailureThreshold
-      value: "5"
-    - name: circuitBreakerRecoveryThreshold
-      value: "3"
-    - name: circuitBreakerTimeout
-      value: "30s"
 scopes:
   - producer
   - consumer
