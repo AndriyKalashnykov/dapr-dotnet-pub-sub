@@ -44,7 +44,7 @@ Build a single project: `dotnet build producer/producer.csproj`
 - **common/** -- Shared library (`OutputType: Library`). Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic. Referenced by both apps.
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** -- ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
-- **tests/** -- TUnit test project. References common, producer, and consumer projects. Contains unit and integration tests using NSubstitute for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
+- **tests/** -- TUnit test project. References common, producer, and consumer projects. Contains unit and integration tests using FakeItEasy for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
 
 ### Message routing (declarative subscription)
 
@@ -80,7 +80,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 
 ## Upgrade Backlog
 
-- [ ] Monitor NSubstitute for .NET 11 compatibility — last release Oct 2024, repo active but slow cadence
+- [x] ~~Monitor NSubstitute~~ — Migrated to FakeItEasy v9.0.1 (Apr 2026). FakeItEasy ships net10.0 TFM, has 4 open issues vs NSubstitute's 104, and better maintenance health.
 - [ ] TUnit daily releases generate frequent Renovate PRs — grouped under `TUnit` package rule; review if PR volume becomes disruptive
 
 ## Skills
