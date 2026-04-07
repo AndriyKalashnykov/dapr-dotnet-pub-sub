@@ -20,9 +20,9 @@
   "enabledManagers": [
     "github-actions",
     "nuget",
-    "docker-compose"
+    "docker-compose",
+    "custom.regex"
   ],
-  "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
   "vulnerabilityAlerts": {
     "labels": [
       "security"
@@ -92,66 +92,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Track act version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
-      ],
+      "description": "Update Makefile tool versions via inline renovate comments",
+      "managerFilePatterns": ["/^Makefile$/"],
       "matchStrings": [
-        "ACT_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "nektos/act",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.*)$"
-    },
-    {
-      "customType": "regex",
-      "description": "Track nvm version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
-      ],
-      "matchStrings": [
-        "NVM_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "nvm-sh/nvm",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.*)$"
-    },
-    {
-      "customType": "regex",
-      "description": "Track Node.js version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
-      ],
-      "matchStrings": [
-        "NODE_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "node",
-      "datasourceTemplate": "node-version"
-    },
-    {
-      "customType": "regex",
-      "description": "Track .NET SDK version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
-      ],
-      "matchStrings": [
-        "DOTNET_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "dotnet-sdk",
-      "datasourceTemplate": "dotnet-version"
-    },
-    {
-      "customType": "regex",
-      "description": "Track Dapr CLI version in Makefile",
-      "fileMatch": [
-        "^Makefile$"
-      ],
-      "matchStrings": [
-        "DAPR_CLI_VERSION\\s*:=\\s*(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "dapr/cli",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.*)$"
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)( versioning=(?<versioning>[^\\s]+))?( extractVersion=(?<extractVersionTemplate>[^\\s]+))?\\n[A-Z_]+\\s*:=\\s*(?<currentValue>[^\\s]+)"
+      ]
     }
   ]
 }

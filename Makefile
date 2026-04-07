@@ -4,9 +4,12 @@
 # Tool versions
 # ---------------------------------------------------------------------------
 DOTNET_VERSION     := 10.0
+# renovate: datasource=github-releases depName=dapr/cli extractVersion=^v(?<version>.*)$
 DAPR_CLI_VERSION   := 1.17.0
 DOCKER_MIN_VERSION := 20.10
+# renovate: datasource=github-releases depName=nvm-sh/nvm extractVersion=^v(?<version>.*)$
 NVM_VERSION        := 0.40.4
+# renovate: datasource=github-releases depName=nektos/act extractVersion=^v(?<version>.*)$
 ACT_VERSION        := 0.2.87
 NODE_VERSION       := 24
 
@@ -41,7 +44,7 @@ deps-run: deps
 #deps-act: @ Install act for local CI
 deps-act: deps
 	@command -v act >/dev/null 2>&1 || { echo "Installing act $(ACT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/nektos/act/v$(ACT_VERSION)/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
+		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash -s -- -b /usr/local/bin v$(ACT_VERSION); \
 	}
 
 #deps-prune: @ Show redundant NuGet package references
@@ -147,6 +150,7 @@ ci: deps lint test build deps-prune-check
 
 #ci-run: @ Run GitHub Actions workflow locally using act
 ci-run: deps-act
+	@docker container prune -f 2>/dev/null || true
 	@act push --container-architecture linux/amd64 \
 		--artifact-server-path /tmp/act-artifacts
 
@@ -172,7 +176,12 @@ renovate-bootstrap:
 
 #renovate-validate: @ Validate Renovate configuration
 renovate-validate: renovate-bootstrap
-	@npx --yes renovate --platform=local
+	@if [ -n "$$GH_ACCESS_TOKEN" ]; then \
+		GITHUB_COM_TOKEN=$$GH_ACCESS_TOKEN npx --yes renovate --platform=local; \
+	else \
+		echo "Warning: GH_ACCESS_TOKEN not set, some dependency lookups may fail"; \
+		npx --yes renovate --platform=local; \
+	fi
 
 .PHONY: help deps deps-run deps-act deps-prune deps-prune-check clean format lint build test update \
         vulncheck run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release \

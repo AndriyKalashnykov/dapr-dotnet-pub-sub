@@ -6,8 +6,7 @@
 
 Dapr publish-subscribe demo with two .NET 10 microservices communicating via Kafka through the Dapr sidecar. The **producer** publishes `TinyMessage` events to a Kafka topic; the **consumer** receives them via Dapr's declarative subscription with content-based routing.
 
-Visit [this](https://docs.dapr.io/developing-applications/building-blocks/pubsub/) link for more information about Dapr
-and Pub-Sub.
+Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applications/building-blocks/pubsub/) for more information.
 
 ## Quick Start
 
@@ -57,7 +56,7 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
-| `make kafka-start` | Start Kafka stack |
+| `make kafka-start` | Start Kafka stack (KRaft mode) |
 | `make kafka-stop` | Stop Kafka stack |
 | `make stop` | Stop Dapr and kill processes on known ports |
 | `make stop-dapr` | Stop Dapr multi-app run |

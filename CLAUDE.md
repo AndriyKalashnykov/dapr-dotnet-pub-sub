@@ -92,6 +92,6 @@ Use the following skills when working on related files:
 | `Makefile` | `/makefile` |
 | `renovate.json` | `/renovate` |
 | `README.md` | `/readme` |
-| `.github/workflows/*.yml` | `/ci-workflow` |
+| `.github/workflows/*.{yml,yaml}` | `/ci-workflow` |
 
 When spawning subagents, always pass conventions from the respective skill into the agent's prompt.
