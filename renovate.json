@@ -46,21 +46,6 @@
       "groupName": "GitHub Actions"
     },
     {
-      "description": "Group .NET Docker images, disable major updates",
-      "groupName": "Dotnet Docker images",
-      "matchPackageNames": [
-        "dotnet-sdk",
-        "mcr.microsoft.com/dotnet/aspnet",
-        "mcr.microsoft.com/dotnet/sdk",
-        "mcr.microsoft.com/dotnet/runtime",
-        "mcr.microsoft.com/dotnet/runtime-deps"
-      ],
-      "extends": [
-        ":disableMajorUpdates",
-        ":pinDigestsDisabled"
-      ]
-    },
-    {
       "description": "Group TUnit test dependencies",
       "groupName": "TUnit",
       "matchPackageNames": [

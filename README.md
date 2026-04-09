@@ -2,20 +2,68 @@
 [![Hits](https://hits.sh/github.com/AndriyKalashnykov/dapr-dotnet-pub-sub.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://app.renovatebot.com/dashboard#github/AndriyKalashnykov/dapr-dotnet-pub-sub)
+
 # Dapr DotNet pub/sub
 
 Dapr publish-subscribe demo with two .NET 10 microservices communicating via Kafka through the Dapr sidecar. The **producer** publishes `TinyMessage` events to a Kafka topic; the **consumer** receives them via Dapr's declarative subscription with content-based routing.
 
 Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applications/building-blocks/pubsub/) for more information.
 
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Language | .NET 10 (pinned via `global.json` → `10.0.201`, `rollForward: latestFeature`) |
+| Framework | ASP.NET Core Web API |
+| Pub/Sub | [Dapr](https://dapr.io/) 1.17.8 (`Dapr.AspNetCore`) |
+| Message Broker | Apache Kafka (KRaft mode, Confluent images) |
+| Testing | [TUnit](https://tunit.dev/) 1.30.8 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
+| Mocking | [FakeItEasy](https://fakeiteasy.github.io/) 9.0.1 |
+| Infrastructure | Docker Compose (Kafka + Kafka UI) |
+| CI/CD | GitHub Actions |
+| Dependencies | [Renovate](https://docs.renovatebot.com/) with platform automerge |
+| Static Analysis | `dotnet format`, Trivy (fs, vuln, secret, misconfig), gitleaks |
+
+## Architecture
+
+```mermaid
+graph LR
+    client[Client]
+    producer[producer<br/>:5232]
+    producerDapr[Dapr sidecar<br/>:3532]
+    kafka[(Kafka topic<br/>incoming-messages)]
+    consumerDapr[Dapr sidecar<br/>:3531]
+    consumer[consumer<br/>:5231]
+    h1[POST /handletype1]
+    h2[POST /handletype2]
+    hd[POST /dafault-messagehandler]
+
+    client -->|POST /send| producer
+    producer --> producerDapr
+    producerDapr -->|publish| kafka
+    kafka -->|subscribe| consumerDapr
+    consumerDapr --> consumer
+    consumer -->|type=="1"| h1
+    consumer -->|type=="2"| h2
+    consumer -->|default| hd
+```
+
 ## Quick Start
 
+In one terminal, start the Kafka infrastructure (blocks):
+
 ```bash
-make deps         # verify required tools (dotnet)
-make build        # restore and build the solution
-make test         # run all tests
-make kafka-start  # start Kafka in KRaft mode (in a separate terminal)
-make run          # build and run both apps via Dapr
+make kafka-start  # Kafka on :9092, Kafka UI on :9080
+```
+
+In a second terminal, build and run the apps:
+
+```bash
+make deps   # verify .NET SDK is installed
+make build  # restore and build the solution
+make test   # run all tests (TUnit)
+make run    # start producer (:5232) + consumer (:5231) via Dapr
+make post   # send test messages to the producer
 ```
 
 ## Prerequisites
@@ -24,16 +72,19 @@ make run          # build and run both apps via Dapr
 |------|---------|---------|
 | [GNU Make](https://www.gnu.org/software/make/) | 3.81+ | Build orchestration |
 | [Git](https://git-scm.com/) | 2.0+ | Version control |
-| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects |
-| [Docker](https://www.docker.com/) | 20.10+ | Run Kafka infrastructure |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.0+ | Sidecar-based pub/sub |
+| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects (pinned via `global.json`) |
+| [Docker](https://www.docker.com/) | 20.10+ | Run Kafka, Trivy, and gitleaks |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.1+ | Sidecar-based pub/sub (run `dapr init` once after install) |
+| [act](https://github.com/nektos/act) | 0.2.87+ | Run GitHub Actions locally (used by `make ci-run`) |
 | [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
-Install all required dependencies:
+Verify the .NET SDK is installed:
 
 ```bash
 make deps
 ```
+
+For full runtime verification (docker, dapr), use `make deps-run`.
 
 ## Available Make Targets
 
@@ -45,101 +96,157 @@ Run `make help` to see all available targets.
 |--------|-------------|
 | `make build` | Restore and build entire solution |
 | `make test` | Run all tests |
-| `make lint` | Check code style and compiler warnings |
-| `make format` | Auto-fix code formatting |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
-| `make post` | Send test messages to producer |
+| `make post` | Send test messages to producer (requires `make run`) |
 | `make update` | Update NuGet packages to latest versions |
-
-### Dapr & Kafka
-
-| Target | Description |
-|--------|-------------|
-| `make kafka-start` | Start Kafka stack (KRaft mode) |
-| `make kafka-stop` | Stop Kafka stack |
-| `make stop` | Stop Dapr and kill processes on known ports |
-| `make stop-dapr` | Stop Dapr multi-app run |
-| `make stop-apps` | Kill processes running on known ports |
 
 ### Code Quality
 
 | Target | Description |
 |--------|-------------|
+| `make format` | Auto-fix code formatting |
+| `make lint` | Check code style and compiler warnings |
 | `make vulncheck` | Check for vulnerable NuGet packages |
+| `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
+| `make secrets` | Scan for committed secrets with gitleaks |
 | `make deps-prune` | Show redundant NuGet package references |
 | `make deps-prune-check` | Verify no redundant NuGet package references |
+| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + deps-prune-check) |
+
+### Dapr & Kafka
+
+| Target | Description |
+|--------|-------------|
+| `make kafka-start` | Start Kafka stack (KRaft mode, foreground) |
+| `make kafka-stop` | Stop Kafka stack and remove volumes |
+| `make stop` | Stop Dapr and kill processes on known ports |
+| `make stop-dapr` | Stop Dapr multi-app run |
+| `make stop-apps` | Kill processes on known ports (usage: `make stop-apps PORTS="5231 5232 ..."`) |
 
 ### CI
 
 | Target | Description |
 |--------|-------------|
-| `make ci` | Run full CI pipeline (lint, test, build, deps-prune-check) |
-| `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) |
+| `make ci` | Run full CI pipeline (static-check, test, build) |
+| `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
 
 ### Utilities
 
 | Target | Description |
 |--------|-------------|
 | `make help` | List available tasks |
-| `make deps` | Check required tool dependencies (dotnet) |
-| `make deps-run` | Check runtime dependencies (dotnet, docker, dapr) |
-| `make deps-act` | Install act for local CI |
-| `make release VERSION=X.Y.Z` | Create a release tag (usage: make release VERSION=1.0.0) |
-| `make renovate-bootstrap` | Install nvm and npm for Renovate |
+| `make deps` | Check required tool dependencies (dotnet, curl) |
+| `make deps-run` | Check runtime dependencies (dotnet, curl, docker, dapr) |
+| `make deps-act` | Install act for local CI (to `~/.local/bin`) |
+| `make release VERSION=vX.Y.Z` | Create a semver-validated release tag |
+| `make renovate-bootstrap` | Install nvm and Node for Renovate |
 | `make renovate-validate` | Validate Renovate configuration |
+
+## Architecture Details
+
+### Projects
+
+Four projects in `dapr-dotnet-pub-sub.slnx`:
+
+- **common/** — Shared library. Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic.
+- **producer/** — ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
+- **consumer/** — ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
+- **tests/** — TUnit test project. References common, producer, and consumer. Uses FakeItEasy for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
+
+### Message Routing (declarative subscription)
+
+Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
+
+| Condition | Route |
+|-----------|-------|
+| `type == "1"` | `POST /handletype1` |
+| `type == "2"` | `POST /handletype2` |
+| default | `POST /dafault-messagehandler` (intentional typo) |
+
+### Dapr Components
+
+All components live in `components/`:
+
+- `kafka.yaml` — Kafka pubsub component (`message-pubsub-kafka`), broker at `localhost:9092`, scoped to producer + consumer
+- `subscription.yaml` — Declarative subscription with content-based routing rules
+- `dapr.yaml` — Dapr configuration (tracing, metrics)
+
+The root-level `dapr.yaml` (not in `components/`) is the multi-app run template used by `dapr run -f .`.
+
+### Port Assignments
+
+| Service  | App Port | Dapr Sidecar Port |
+|----------|----------|-------------------|
+| producer | 5232     | 3532              |
+| consumer | 5231     | 3531              |
+
+### Infrastructure
+
+`docker-compose-kafka.yml` runs Kafka in KRaft mode (no Zookeeper):
+
+| Service  | Port | Purpose |
+|----------|------|---------|
+| Kafka    | 9092 | Message broker |
+| Kafka UI | 9080 | Web UI at <http://localhost:9080> |
+
+## CI/CD
+
+GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, and redundant package check.
+
+| Job | Triggers | Steps |
+|-----|----------|-------|
+| **static-check** | push, PR, tags | `make static-check` (composite quality gate) |
+| **test** | after static-check | `make test` (TUnit) |
+| **build** | after static-check | `make build` |
+
+`test` and `build` run in parallel after `static-check` passes (fail-fast).
+
+A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
+
+### Required Secrets and Variables
+
+No user-defined secrets or variables are required — workflows use only the built-in `GITHUB_TOKEN` provided automatically to every GitHub Actions run.
+
+### Dependency Updates
+
+[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK, and Docker Compose image updates into single PRs, and uses a custom regex manager to update Makefile tool version constants (`TRIVY_VERSION`, `GITLEAKS_VERSION`, `ACT_VERSION`, `NVM_VERSION`, `DAPR_CLI_VERSION`) via inline `# renovate:` comments.
 
 ## Run all apps with multi-app run template file
 
-This section shows how to run both applications at once
-using [multi-app run template files](https://docs.dapr.io/developing-applications/local-development/multi-app-dapr-run/multi-app-overview/)
-with `dapr run -f .`. This enables to you test the interactions between multiple applications.
+This section shows how to run both applications at once using [multi-app run template files](https://docs.dapr.io/developing-applications/local-development/multi-app-dapr-run/multi-app-overview/) with `dapr run -f .`.
 
-1. Open a new terminal window and run Kafka:
+1. Open a new terminal and run Kafka:
 
 ```bash
 make kafka-start
 ```
 
-
-2. Open a new terminal window and run consumer and producer:
+2. Open a new terminal and run consumer and producer:
 
 ```bash
 make run
 ```
 
-3. Send a message to the producer app:
+3. Send a message to the producer:
+
 ```bash
-curl -X POST http://localhost:5232/send -H "Content-Type: application/json" -d '{"id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z", "type": "2"}'
+curl -X POST http://localhost:5232/send \
+  -H "Content-Type: application/json" \
+  -d '{"id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d", "timeStamp": "2025-09-26T02:52:04.835Z", "type": "2"}'
 ```
 
-The terminal console output should look similar to this:
+Example output (abbreviated):
 
 ```text
-== APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
-== APP - producer ==       Request starting HTTP/1.1 POST http://localhost:5232/send - application/json 67
-== APP - producer == Received request body: {
-== APP - producer ==     "id": "a1cdd036-c529-4bf9-bd59-d7148ef9237d",
-== APP - producer ==     "timeStamp": "2025-09-26T02:52:04.835Z",
-== APP - producer ==     "type": "2"
-== APP - producer == }
-== APP - producer == info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
-== APP - producer ==       Executing endpoint 'HTTP: POST /send'
-== APP - producer == Sent message a1cdd036-c529-4bf9-bd59-d7148ef9237d, timestamp: 9/26/2025 2:52:04 AM +00:00
-== APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[1]
-== APP - producer ==       Setting HTTP status code 202.
-== APP - producer == info: Microsoft.AspNetCore.Http.Result.AcceptedResult[3]
-== APP - producer ==       Writing value of type 'Guid' as Json.
+== APP - producer == Request starting HTTP/1.1 POST /send
+== APP - producer == Sent message a1cdd036-..., timestamp: 9/26/2025 2:52:04 AM +00:00
+== APP - producer == Setting HTTP status code 202.
 == APP - consumer == Request received: POST /handletype2
-== APP - producer == info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
-== APP - producer ==       Executed endpoint 'HTTP: POST /send'
-== APP - producer == info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
-== APP - producer ==       Request finished HTTP/1.1 POST http://localhost:5232/send - 202 - application/json;+charset=utf-8 191.3736ms
-== APP - consumer == Received message a1cdd036-c529-4bf9-bd59-d7148ef9237d, timestamp: 9/26/2025 2:52:04 AM +00:00
-...
+== APP - consumer == Received message a1cdd036-..., timestamp: 9/26/2025 2:52:04 AM +00:00
 ```
 
-4. Stop and clean up application processes and Kafka
+4. Stop and clean up application processes and Kafka:
 
 ```bash
 make stop
@@ -148,46 +255,25 @@ make kafka-stop
 
 ## Run a single app at a time with Dapr (Optional)
 
-An alternative to running all or multiple applications at once is to run single apps one-at-a-time using multiple
-`dapr run .. -- dotnet run` commands. This next section covers how to do this.
+An alternative to running all applications at once is to run single apps one-at-a-time using multiple `dapr run ... -- dotnet run` commands.
 
 ### Run Dotnet message subscriber with Dapr
 
-1. Run the Dotnet subscriber app with Dapr:
-
 ```bash
 cd ./consumer
-dapr run --app-id consumer --app-port 5231 --components-path ../components dotnet run
+dapr run --app-id consumer --app-port 5231 --resources-path ../components dotnet run
 ```
 
 ### Run Dotnet message publisher with Dapr
 
-1. Run the Dotnet publisher app with Dapr:
-
 ```bash
 cd ./producer
-dapr run --app-id producer --app-port 5232 --components-path ../components dotnet run
+dapr run --app-id producer --app-port 5232 --resources-path ../components dotnet run
 ```
 
-2. Stop and clean up application processes
+Stop and clean up:
 
 ```bash
 dapr stop --app-id consumer
 dapr stop --app-id producer
 ```
-
-## CI/CD
-
-GitHub Actions runs on every push to `main`, tags `v*`, and pull requests. The pipeline enforces code style with `dotnet format`, builds the solution, and runs TUnit tests.
-
-| Job | Triggers | Steps |
-|-----|----------|-------|
-| **static-check** | push, PR, tags | Code style and compiler warnings via `make lint` |
-| **test** | after static-check | Run TUnit tests via `make test` |
-| **build** | after static-check | Restore and build via `make build`, verify no redundant packages |
-
-Test and build run in parallel after static-check passes (fail-fast).
-
-The `Cleanup old workflow runs` workflow runs weekly to delete runs older than 7 days.
-
-[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with platform automerge enabled.

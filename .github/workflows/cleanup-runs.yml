@@ -4,17 +4,17 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: cleanup
+  group: cleanup-${{ github.workflow }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
   actions: write
 
 jobs:
-  cleanup:
+  cleanup-runs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -24,8 +24,36 @@ jobs:
     steps:
       - name: Delete old workflow runs
         run: |
+          set -euo pipefail
           CUTOFF=$(date -u -d "$RETAIN_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
           gh run list --repo "${{ github.repository }}" \
             --json databaseId,createdAt --limit 200 \
-            --jq "sort_by(.createdAt) | reverse | .[$KEEP_MINIMUM:] | .[] | select(.createdAt < \"$CUTOFF\") | .databaseId" \
+          | jq -r \
+              --arg cutoff "$CUTOFF" \
+              --argjson keep "$KEEP_MINIMUM" \
+              'sort_by(.createdAt) | reverse | .[$keep:] | .[] | select(.createdAt < $cutoff) | .databaseId' \
           | xargs -r -I{} gh run delete {} --repo "${{ github.repository }}"
+
+  cleanup-caches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Delete caches from deleted/merged branches
+        run: |
+          set -euo pipefail
+          # Get all cache keys grouped by ref
+          gh api --paginate "/repos/${{ github.repository }}/actions/caches" \
+            --jq '.actions_caches[] | "\(.id) \(.ref)"' \
+          | while read -r id ref; do
+              case "$ref" in
+                refs/heads/main|refs/heads/master) continue ;;
+              esac
+              # Delete cache if branch no longer exists
+              branch="${ref#refs/heads/}"
+              if ! gh api "/repos/${{ github.repository }}/branches/${branch}" >/dev/null 2>&1; then
+                echo "Deleting cache ${id} from stale ref ${ref}"
+                gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${id}" || true
+              fi
+            done

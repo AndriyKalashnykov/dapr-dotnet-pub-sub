@@ -4,12 +4,12 @@
     "net10.0": {
       "Dapr.AspNetCore": {
         "type": "Direct",
-        "requested": "[1.17.7, )",
-        "resolved": "1.17.7",
-        "contentHash": "yRXbCjQQ+Mm5wtCVfwzsIb8eliS16ekUQzGqdepW9LkfK5gdESyM4V1/ZijvmiFJEBJgXCCiX4rp0RK4LaMaRQ==",
+        "requested": "[1.17.8, )",
+        "resolved": "1.17.8",
+        "contentHash": "xIDDhPn2UX0o5iyLfZXq3XEK3hGlCV2eeDHP33ggNme7cnAwnXy64bXs6W2/NtO4RQdrBU9SGV7bxw6Pd3cyGQ==",
         "dependencies": {
-          "Dapr.Client": "1.17.7",
-          "Dapr.Common": "1.17.7",
+          "Dapr.Client": "1.17.8",
+          "Dapr.Common": "1.17.8",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0"
@@ -17,11 +17,11 @@
       },
       "Dapr.Client": {
         "type": "Transitive",
-        "resolved": "1.17.7",
-        "contentHash": "YGA46q/Qr4VupRGTx3VHph3puXqYrcV4twzDBsx4r9Gm2enrOyHjR/CF+oNqaGW9EfNd26ceMcR295FqPKqEIQ==",
+        "resolved": "1.17.8",
+        "contentHash": "x1DJiTfFfWuKMqV5+QucnYb2/AZGC/1rlvQCHax8axkHwlDUYUDhiU8HJoqeN0jMRoF3NW6oN0Ya1r8qkGz4fQ==",
         "dependencies": {
-          "Dapr.Common": "1.17.7",
-          "Dapr.Protos": "1.17.7",
+          "Dapr.Common": "1.17.8",
+          "Dapr.Protos": "1.17.8",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0"
@@ -29,10 +29,10 @@
       },
       "Dapr.Common": {
         "type": "Transitive",
-        "resolved": "1.17.7",
-        "contentHash": "08tSD6hBqGUq8hUdqrLmcwtMRsEwKAuxXqC3pgAJtyUIxP8xbmYUP2tv6us8oRNYQSr/vMP4hlfb9NGk+34j9Q==",
+        "resolved": "1.17.8",
+        "contentHash": "W4IQICNwgFHDI76Ig0HrMEfRvZOj1E2hJIlMPLPLxTV0BLX0tEfgSHdLNyHdGGGd8L9VG/R3ujVEH1GZek+n0g==",
         "dependencies": {
-          "Dapr.Protos": "1.17.7",
+          "Dapr.Protos": "1.17.8",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0"
@@ -40,8 +40,8 @@
       },
       "Dapr.Protos": {
         "type": "Transitive",
-        "resolved": "1.17.7",
-        "contentHash": "jKU/tbkmh29z+hnNGuisgaD233zjOcf1IAnbRL1Oovt6ryMZemiBpnrtcpOOEnCroCx5kBbJVAKwQqIdQiU97A==",
+        "resolved": "1.17.8",
+        "contentHash": "4ao8NFFL1cI4WIsPj349OGHAVlbRJrxjxmegire6+8mvlXv97K7950WSwa+Jphite7g/V7YLuukSoKC1ZB7L6g==",
         "dependencies": {
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
@@ -85,7 +85,7 @@
       "common": {
         "type": "Project",
         "dependencies": {
-          "Dapr.AspNetCore": "[1.17.7, )"
+          "Dapr.AspNetCore": "[1.17.8, )"
         }
       }
     }
