@@ -134,24 +134,20 @@ mermaid-lint:
 		echo "No Mermaid blocks found — skipping."; \
 		exit 0; \
 	fi; \
-	OUTDIR=$$(mktemp -d); \
-	chmod 0777 "$$OUTDIR"; \
-	trap 'rm -rf "$$OUTDIR"' EXIT; \
 	FAILED=0; \
 	for md in $$MD_FILES; do \
 		echo "Validating Mermaid blocks in $$md..."; \
-		if docker run --rm -v "$$PWD:/data" -v "$$OUTDIR:/out" \
+		LOG=$$(mktemp); \
+		if docker run --rm -v "$$PWD:/data" \
 			minlag/mermaid-cli:$(MERMAID_CLI_VERSION) \
-			-i "/data/$$md" -o "/out/$$(basename $$md .md).svg" >/dev/null 2>&1; then \
+			-i "/data/$$md" -o "/tmp/$$(basename $$md .md).svg" >"$$LOG" 2>&1; then \
 			echo "  ✓ All blocks rendered cleanly."; \
 		else \
-			echo "  ✗ Parse error in $$md — re-running with output:"; \
-			docker run --rm -v "$$PWD:/data" -v "$$OUTDIR:/out" \
-				minlag/mermaid-cli:$(MERMAID_CLI_VERSION) \
-				-i "/data/$$md" -o "/out/$$(basename $$md .md).svg" 2>&1 \
-				| grep -E '(Parse error|Expecting|\^)' || true; \
+			echo "  ✗ Parse error in $$md:"; \
+			sed 's/^/    /' "$$LOG"; \
 			FAILED=$$((FAILED + 1)); \
 		fi; \
+		rm -f "$$LOG"; \
 	done; \
 	if [ "$$FAILED" -gt 0 ]; then \
 		echo "Mermaid lint: $$FAILED file(s) had parse errors."; \
