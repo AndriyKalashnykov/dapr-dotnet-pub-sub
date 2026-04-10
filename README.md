@@ -43,8 +43,8 @@ graph LR
     producerDapr -->|publish| kafka
     kafka -->|subscribe| consumerDapr
     consumerDapr --> consumer
-    consumer -->|type=="1"| h1
-    consumer -->|type=="2"| h2
+    consumer -->|"type == '1'"| h1
+    consumer -->|"type == '2'"| h2
     consumer -->|default| hd
 ```
 
