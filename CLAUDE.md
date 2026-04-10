@@ -19,9 +19,10 @@ make lint                     # Check code style and compiler warnings
 make vulncheck                # Check for vulnerable NuGet packages
 make trivy-fs                 # Trivy filesystem scan (vuln, secret, misconfig)
 make secrets                  # Scan for committed secrets with gitleaks
+make mermaid-lint             # Validate Mermaid diagrams in markdown files
 make deps-prune               # Show redundant NuGet package references
 make deps-prune-check         # Verify no redundant NuGet package references
-make static-check             # Composite gate: lint + vulncheck + trivy-fs + secrets + deps-prune-check
+make static-check             # Composite gate: lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
 make build                    # Restore + build entire solution
 make test                     # Run all tests (depends on deps)
 make update                   # Update NuGet packages to latest versions
@@ -85,7 +86,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.30.8 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
 - CI: GitHub Actions — `static-check` → `build`/`test` (parallel), plus weekly `cleanup-runs.yml` for old runs and caches
-- Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), and `deps-prune-check`
+- Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 
 ## Upgrade Backlog
 

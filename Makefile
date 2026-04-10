@@ -23,6 +23,8 @@ ACT_VERSION        := 0.2.87
 TRIVY_VERSION      := 0.69.3
 # renovate: datasource=github-releases depName=gitleaks/gitleaks extractVersion=^v(?<version>.*)$
 GITLEAKS_VERSION   := 8.30.1
+# renovate: datasource=docker depName=minlag/mermaid-cli
+MERMAID_CLI_VERSION := 11.12.0
 
 # ---------------------------------------------------------------------------
 # Project constants
@@ -123,8 +125,41 @@ secrets:
 	@docker run --rm -v "$$PWD:/repo" ghcr.io/gitleaks/gitleaks:v$(GITLEAKS_VERSION) \
 		detect --source /repo --redact --no-banner --exit-code 0
 
-#static-check: @ Composite quality gate (lint + vulncheck + trivy-fs + secrets + deps-prune-check)
-static-check: lint vulncheck trivy-fs secrets deps-prune-check
+#mermaid-lint: @ Validate Mermaid diagrams in markdown files
+mermaid-lint:
+	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for mermaid-lint"; exit 1; }
+	@set -euo pipefail; \
+	MD_FILES=$$(grep -lF '```mermaid' README.md CLAUDE.md 2>/dev/null || true); \
+	if [ -z "$$MD_FILES" ]; then \
+		echo "No Mermaid blocks found — skipping."; \
+		exit 0; \
+	fi; \
+	OUTDIR=$$(mktemp -d); \
+	chmod 0777 "$$OUTDIR"; \
+	trap 'rm -rf "$$OUTDIR"' EXIT; \
+	FAILED=0; \
+	for md in $$MD_FILES; do \
+		echo "Validating Mermaid blocks in $$md..."; \
+		if docker run --rm -v "$$PWD:/data" -v "$$OUTDIR:/out" \
+			minlag/mermaid-cli:$(MERMAID_CLI_VERSION) \
+			-i "/data/$$md" -o "/out/$$(basename $$md .md).svg" >/dev/null 2>&1; then \
+			echo "  ✓ All blocks rendered cleanly."; \
+		else \
+			echo "  ✗ Parse error in $$md — re-running with output:"; \
+			docker run --rm -v "$$PWD:/data" -v "$$OUTDIR:/out" \
+				minlag/mermaid-cli:$(MERMAID_CLI_VERSION) \
+				-i "/data/$$md" -o "/out/$$(basename $$md .md).svg" 2>&1 \
+				| grep -E '(Parse error|Expecting|\^)' || true; \
+			FAILED=$$((FAILED + 1)); \
+		fi; \
+	done; \
+	if [ "$$FAILED" -gt 0 ]; then \
+		echo "Mermaid lint: $$FAILED file(s) had parse errors."; \
+		exit 1; \
+	fi
+
+#static-check: @ Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check)
+static-check: lint vulncheck trivy-fs secrets mermaid-lint deps-prune-check
 	@echo "All static checks passed."
 
 #build: @ Restore and build entire solution
@@ -237,5 +272,5 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-run deps-act deps-prune deps-prune-check clean format lint vulncheck \
-        trivy-fs secrets static-check build test update run post stop stop-dapr stop-apps \
-        kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+        trivy-fs secrets mermaid-lint static-check build test update run post stop stop-dapr \
+        stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

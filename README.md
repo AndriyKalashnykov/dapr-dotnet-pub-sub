@@ -22,7 +22,7 @@ Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applicati
 | Infrastructure | Docker Compose (Kafka + Kafka UI) |
 | CI/CD | GitHub Actions |
 | Dependencies | [Renovate](https://docs.renovatebot.com/) with platform automerge |
-| Static Analysis | `dotnet format`, Trivy (fs, vuln, secret, misconfig), gitleaks |
+| Static Analysis | `dotnet format`, Trivy (fs, vuln, secret, misconfig), gitleaks, mermaid-cli (diagram lint) |
 
 ## Architecture
 
@@ -110,9 +110,10 @@ Run `make help` to see all available targets.
 | `make vulncheck` | Check for vulnerable NuGet packages |
 | `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
 | `make secrets` | Scan for committed secrets with gitleaks |
+| `make mermaid-lint` | Validate Mermaid diagrams in markdown files |
 | `make deps-prune` | Show redundant NuGet package references |
 | `make deps-prune-check` | Verify no redundant NuGet package references |
-| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + deps-prune-check) |
+| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
 
 ### Dapr & Kafka
 
@@ -192,7 +193,7 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 
 ## CI/CD
 
-GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, and redundant package check.
+GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check.
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
