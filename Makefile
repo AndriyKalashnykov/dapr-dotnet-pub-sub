@@ -12,7 +12,7 @@ export PATH := $(HOME)/.local/bin:$(PATH)
 # .NET SDK version derived from global.json (single source of truth)
 DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1]"."v[2]; exit}' global.json 2>/dev/null)
 # Node version derived from .nvmrc (single source of truth)
-NODE_VERSION       := $(shell cat .nvmrc 2>/dev/null)
+NODE_VERSION       := $(shell cat .nvmrc 2>/dev/null || echo 24)
 # renovate: datasource=github-releases depName=dapr/cli extractVersion=^v(?<version>.*)$
 DAPR_CLI_VERSION   := 1.17.1
 # renovate: datasource=github-releases depName=nvm-sh/nvm extractVersion=^v(?<version>.*)$
@@ -50,9 +50,12 @@ deps:
 	@command -v dotnet >/dev/null 2>&1 || { echo "ERROR: dotnet is not installed (need $(DOTNET_VERSION)+)"; exit 1; }
 	@command -v curl   >/dev/null 2>&1 || { echo "ERROR: curl is not installed"; exit 1; }
 
-#deps-run: @ Check runtime dependencies (dotnet, curl, docker, dapr)
-deps-run: deps
+#deps-docker: @ Check Docker is installed (for containerised scanners)
+deps-docker:
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed"; exit 1; }
+
+#deps-run: @ Check runtime dependencies (dotnet, curl, docker, dapr)
+deps-run: deps deps-docker
 	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (need $(DAPR_CLI_VERSION)+)"; exit 1; }
 
 #deps-act: @ Install act for local CI (to ~/.local/bin)
@@ -109,25 +112,22 @@ vulncheck: deps
 	@dotnet list $(SOLUTION) package --vulnerable --include-transitive 2>&1 | tee /dev/stderr | grep -q 'has the following vulnerable packages' && exit 1 || true
 
 #trivy-fs: @ Trivy filesystem scan (vuln, secret, misconfig)
-trivy-fs:
-	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for trivy-fs"; exit 1; }
+trivy-fs: deps-docker
 	@echo "Running Trivy filesystem scan..."
 	@docker run --rm -v "$$PWD:/src" ghcr.io/aquasecurity/trivy:$(TRIVY_VERSION) \
 		fs --scanners vuln,secret,misconfig \
 		--severity HIGH,CRITICAL \
 		--skip-dirs '**/bin,**/obj' \
-		--exit-code 0 --no-progress /src
+		--exit-code 1 --no-progress /src
 
 #secrets: @ Scan for committed secrets with gitleaks
-secrets:
-	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for secrets scan"; exit 1; }
+secrets: deps-docker
 	@echo "Running gitleaks secret scan..."
 	@docker run --rm -v "$$PWD:/repo" ghcr.io/gitleaks/gitleaks:v$(GITLEAKS_VERSION) \
-		detect --source /repo --redact --no-banner --exit-code 0
+		detect --source /repo --redact --no-banner
 
 #mermaid-lint: @ Validate Mermaid diagrams in markdown files
-mermaid-lint:
-	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for mermaid-lint"; exit 1; }
+mermaid-lint: deps-docker
 	@set -euo pipefail; \
 	MD_FILES=$$(grep -lF '```mermaid' README.md CLAUDE.md 2>/dev/null || true); \
 	if [ -z "$$MD_FILES" ]; then \
@@ -163,9 +163,13 @@ build: deps
 	@dotnet restore $(SOLUTION)
 	@dotnet build $(SOLUTION)
 
-#test: @ Run all tests
+#test: @ Run unit tests (TinyMessageDto only)
 test: deps
-	@dotnet run --project tests/tests.csproj
+	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/TinyMessageDtoTests/*"
+
+#e2e: @ Run end-to-end tests (Producer/Consumer via WebApplicationFactory)
+e2e: deps
+	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/*EndpointTests/*"
 
 #update: @ Update NuGet packages to latest versions
 update: deps
@@ -221,8 +225,8 @@ kafka-start: deps-run
 kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
-#ci: @ Run full CI pipeline (static-check, test, build)
-ci: deps static-check test build
+#ci: @ Run full CI pipeline (static-check, build, test, e2e)
+ci: static-check build test e2e
 	@echo "CI pipeline passed."
 
 #ci-run: @ Run GitHub Actions workflow locally using act
@@ -245,7 +249,8 @@ release:
 		echo "ERROR: tag must match vX.Y.Z (got: $$NEW_TAG)"; exit 1; \
 	fi; \
 	git tag -a "$$NEW_TAG" -m "Release $$NEW_TAG"; \
-	echo "Tagged $$NEW_TAG. Push with: git push origin $$NEW_TAG"
+	read -r -p "Push $$NEW_TAG to origin? [y/N] " ANS; \
+	case "$${ANS:-N}" in [yY]) git push origin "$$NEW_TAG" && echo "Pushed $$NEW_TAG." ;; *) echo "Tag created locally. Push with: git push origin $$NEW_TAG" ;; esac
 
 #renovate-bootstrap: @ Install nvm and Node for Renovate
 renovate-bootstrap:
@@ -267,6 +272,7 @@ renovate-validate: renovate-bootstrap
 		npx --yes renovate --platform=local; \
 	fi
 
-.PHONY: help deps deps-run deps-act deps-prune deps-prune-check clean format lint vulncheck \
-        trivy-fs secrets mermaid-lint static-check build test update run post stop stop-dapr \
-        stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+.PHONY: help deps deps-docker deps-run deps-act deps-prune deps-prune-check clean format lint \
+        vulncheck trivy-fs secrets mermaid-lint static-check build test e2e update run post \
+        stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap \
+        renovate-validate

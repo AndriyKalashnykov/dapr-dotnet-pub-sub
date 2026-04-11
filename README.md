@@ -61,7 +61,8 @@ In a second terminal, build and run the apps:
 ```bash
 make deps   # verify .NET SDK is installed
 make build  # restore and build the solution
-make test   # run all tests (TUnit)
+make test   # run unit tests (TUnit)
+make e2e    # run end-to-end tests (WebApplicationFactory)
 make run    # start producer (:5232) + consumer (:5231) via Dapr
 make post   # send test messages to the producer
 ```
@@ -95,7 +96,8 @@ Run `make help` to see all available targets.
 | Target | Description |
 |--------|-------------|
 | `make build` | Restore and build entire solution |
-| `make test` | Run all tests |
+| `make test` | Run unit tests (TinyMessageDto only) |
+| `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
 | `make post` | Send test messages to producer (requires `make run`) |
@@ -129,7 +131,7 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
-| `make ci` | Run full CI pipeline (static-check, test, build) |
+| `make ci` | Run full CI pipeline (static-check, build, test, e2e) |
 | `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
 
 ### Utilities
@@ -138,6 +140,7 @@ Run `make help` to see all available targets.
 |--------|-------------|
 | `make help` | List available tasks |
 | `make deps` | Check required tool dependencies (dotnet, curl) |
+| `make deps-docker` | Check Docker is installed (for containerised scanners) |
 | `make deps-run` | Check runtime dependencies (dotnet, curl, docker, dapr) |
 | `make deps-act` | Install act for local CI (to `~/.local/bin`) |
 | `make release VERSION=vX.Y.Z` | Create a semver-validated release tag |
@@ -198,10 +201,12 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | Job | Triggers | Steps |
 |-----|----------|-------|
 | **static-check** | push, PR, tags | `make static-check` (composite quality gate) |
-| **test** | after static-check | `make test` (TUnit) |
 | **build** | after static-check | `make build` |
+| **test** | after static-check | `make test` (unit tests) |
+| **e2e** | after build + test | `make e2e` (WebApplicationFactory endpoint tests) |
+| **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed or was cancelled (single branch-protection check) |
 
-`test` and `build` run in parallel after `static-check` passes (fail-fast).
+`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 
