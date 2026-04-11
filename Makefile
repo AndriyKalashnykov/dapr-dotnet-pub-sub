@@ -14,7 +14,9 @@ DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1
 # Node version derived from .nvmrc (single source of truth)
 NODE_VERSION       := $(shell cat .nvmrc 2>/dev/null || echo 24)
 # renovate: datasource=github-releases depName=dapr/cli extractVersion=^v(?<version>.*)$
-DAPR_CLI_VERSION   := 1.17.1
+DAPR_CLI_VERSION     := 1.17.1
+# renovate: datasource=github-releases depName=dapr/dapr extractVersion=^v(?<version>.*)$
+DAPR_RUNTIME_VERSION := 1.17.4
 # renovate: datasource=github-releases depName=nvm-sh/nvm extractVersion=^v(?<version>.*)$
 NVM_VERSION        := 0.40.4
 # renovate: datasource=github-releases depName=nektos/act extractVersion=^v(?<version>.*)$
@@ -29,11 +31,14 @@ MERMAID_CLI_VERSION := 11.12.0
 # ---------------------------------------------------------------------------
 # Project constants
 # ---------------------------------------------------------------------------
-APP_NAME   := dapr-dotnet-pub-sub
-CURRENTTAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "none")
-SOLUTION   := dapr-dotnet-pub-sub.slnx
-PORTS      := 3530 3531 3532 5230 5231 5232 7006 7007
-SEMVER_RE  := ^v[0-9]+\.[0-9]+\.[0-9]+$$
+APP_NAME         := dapr-dotnet-pub-sub
+CURRENTTAG       := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "none")
+SOLUTION         := dapr-dotnet-pub-sub.slnx
+PORTS            := 3530 3531 3532 5230 5231 5232 7006 7007
+SEMVER_RE        := ^v[0-9]+\.[0-9]+\.[0-9]+$$
+COVERAGE_DIR     := tests/TestResults
+COVERAGE_FILE    := coverage.cobertura.xml
+COVERAGE_MIN     := 0.80
 
 # ---------------------------------------------------------------------------
 # Targets
@@ -171,6 +176,25 @@ test: deps
 e2e: deps
 	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/*EndpointTests/*"
 
+#coverage-check: @ Run full test suite with code coverage and enforce 80% threshold
+coverage-check: deps
+	@set -euo pipefail; \
+	rm -rf $(COVERAGE_DIR); \
+	mkdir -p $(COVERAGE_DIR); \
+	dotnet run --project tests/tests.csproj -- \
+		--coverage \
+		--coverage-output-format cobertura \
+		--coverage-output $(COVERAGE_FILE) \
+		--results-directory $(COVERAGE_DIR); \
+	COV_XML="$(COVERAGE_DIR)/$(COVERAGE_FILE)"; \
+	if [ ! -f "$$COV_XML" ]; then echo "ERROR: coverage report not produced at $$COV_XML"; exit 1; fi; \
+	RATE=$$(grep -oP '^<coverage line-rate="\K[0-9.]+' "$$COV_XML" | head -1); \
+	if [ -z "$$RATE" ]; then echo "ERROR: could not parse line-rate from $$COV_XML"; exit 1; fi; \
+	echo "Line coverage: $$RATE (threshold: $(COVERAGE_MIN))"; \
+	awk -v r="$$RATE" -v t="$(COVERAGE_MIN)" 'BEGIN{ if (r+0 >= t+0) exit 0; exit 1 }' || \
+		{ echo "ERROR: coverage $$RATE is below threshold $(COVERAGE_MIN)"; exit 1; }; \
+	echo "Coverage check passed."
+
 #update: @ Update NuGet packages to latest versions
 update: deps
 	@set -euo pipefail; \
@@ -225,9 +249,21 @@ kafka-start: deps-run
 kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
-#ci: @ Run full CI pipeline (static-check, build, test, e2e)
-ci: static-check build test e2e
+#ci: @ Run full CI pipeline (static-check, build, test, e2e, coverage-check)
+ci: static-check build test e2e coverage-check
 	@echo "CI pipeline passed."
+
+#dapr-init: @ Initialize Dapr with pinned runtime version (idempotent)
+dapr-init: deps-run
+	@set -euo pipefail; \
+	INSTALLED=$$(dapr --version 2>/dev/null | awk -F': ' '/Runtime version/ {gsub(/^v/, "", $$2); print $$2}'); \
+	if [ "$$INSTALLED" = "$(DAPR_RUNTIME_VERSION)" ]; then \
+		echo "Dapr runtime $(DAPR_RUNTIME_VERSION) already installed."; \
+	else \
+		echo "Installing Dapr runtime $(DAPR_RUNTIME_VERSION) (current: $${INSTALLED:-none})..."; \
+		dapr uninstall --all 2>/dev/null || true; \
+		dapr init --runtime-version $(DAPR_RUNTIME_VERSION); \
+	fi
 
 #ci-run: @ Run GitHub Actions workflow locally using act
 ci-run: deps-act
@@ -273,6 +309,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-act deps-prune deps-prune-check clean format lint \
-        vulncheck trivy-fs secrets mermaid-lint static-check build test e2e update run post \
-        stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap \
-        renovate-validate
+        vulncheck trivy-fs secrets mermaid-lint static-check build test e2e coverage-check \
+        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run \
+        release renovate-bootstrap renovate-validate

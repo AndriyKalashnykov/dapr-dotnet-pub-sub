@@ -59,12 +59,13 @@ make kafka-start  # Kafka on :9092, Kafka UI on :9080
 In a second terminal, build and run the apps:
 
 ```bash
-make deps   # verify .NET SDK is installed
-make build  # restore and build the solution
-make test   # run unit tests (TUnit)
-make e2e    # run end-to-end tests (WebApplicationFactory)
-make run    # start producer (:5232) + consumer (:5231) via Dapr
-make post   # send test messages to the producer
+make deps            # verify .NET SDK is installed
+make build           # restore and build the solution
+make test            # run unit tests (TUnit)
+make e2e             # run end-to-end tests (WebApplicationFactory)
+make coverage-check  # run all tests and enforce 80% line coverage
+make run             # start producer (:5232) + consumer (:5231) via Dapr
+make post            # send test messages to the producer
 ```
 
 ## Prerequisites
@@ -75,7 +76,7 @@ make post   # send test messages to the producer
 | [Git](https://git-scm.com/) | 2.0+ | Version control |
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects (pinned via `global.json`) |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka, Trivy, and gitleaks |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.1+ | Sidecar-based pub/sub (run `dapr init` once after install) |
+| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.1+ | Sidecar-based pub/sub (run `make dapr-init` once to install the pinned runtime) |
 | [act](https://github.com/nektos/act) | 0.2.87+ | Run GitHub Actions locally (used by `make ci-run`) |
 | [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
@@ -98,6 +99,7 @@ Run `make help` to see all available targets.
 | `make build` | Restore and build entire solution |
 | `make test` | Run unit tests (TinyMessageDto only) |
 | `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
+| `make coverage-check` | Run all tests with coverage and enforce 80% line threshold |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
 | `make post` | Send test messages to producer (requires `make run`) |
@@ -131,8 +133,9 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
-| `make ci` | Run full CI pipeline (static-check, build, test, e2e) |
+| `make ci` | Run full CI pipeline (static-check, build, test, e2e, coverage-check) |
 | `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
+| `make dapr-init` | Install the pinned Dapr runtime version (idempotent) |
 
 ### Utilities
 
@@ -204,9 +207,10 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **build** | after static-check | `make build` |
 | **test** | after static-check | `make test` (unit tests) |
 | **e2e** | after build + test | `make e2e` (WebApplicationFactory endpoint tests) |
+| **coverage** | after build + test | `make coverage-check` (80% line threshold) + upload cobertura report |
 | **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed or was cancelled (single branch-protection check) |
 
-`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
+`build` and `test` run in parallel after `static-check` passes; `e2e` and `coverage` run in parallel after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 
