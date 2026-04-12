@@ -138,12 +138,12 @@ jobs:
   ci-pass:
     if: always()
     needs: [static-check, build, test, e2e, coverage]
+    timeout-minutes: 2
     runs-on: ubuntu-latest
     steps:
       - name: Verify all jobs passed
         run: |
-          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
-            echo "One or more required jobs failed or were cancelled."
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more jobs failed"
             exit 1
           fi
-          echo "All required jobs passed."

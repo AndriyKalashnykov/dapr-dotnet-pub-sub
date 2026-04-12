@@ -114,7 +114,13 @@ lint: deps
 
 #vulncheck: @ Check for vulnerable NuGet packages
 vulncheck: deps
-	@dotnet list $(SOLUTION) package --vulnerable --include-transitive 2>&1 | tee /dev/stderr | grep -q 'has the following vulnerable packages' && exit 1 || true
+	@set -euo pipefail; \
+	OUTPUT=$$(dotnet list $(SOLUTION) package --vulnerable --include-transitive 2>&1); \
+	echo "$$OUTPUT"; \
+	if echo "$$OUTPUT" | grep -q 'has the following vulnerable packages'; then \
+		echo "ERROR: Vulnerable packages found (see above)."; \
+		exit 1; \
+	fi
 
 #trivy-fs: @ Trivy filesystem scan (vuln, secret, misconfig)
 trivy-fs: deps-docker
@@ -134,7 +140,7 @@ secrets: deps-docker
 #mermaid-lint: @ Validate Mermaid diagrams in markdown files
 mermaid-lint: deps-docker
 	@set -euo pipefail; \
-	MD_FILES=$$(grep -lF '```mermaid' README.md CLAUDE.md 2>/dev/null || true); \
+	MD_FILES=$$(git ls-files '*.md' 2>/dev/null | xargs grep -lF '```mermaid' 2>/dev/null || true); \
 	if [ -z "$$MD_FILES" ]; then \
 		echo "No Mermaid blocks found — skipping."; \
 		exit 0; \
@@ -265,6 +271,46 @@ dapr-init: deps-run
 		dapr init --runtime-version $(DAPR_RUNTIME_VERSION); \
 	fi
 
+DAPR_LOG := /tmp/dapr-e2e.log
+
+#e2e-sidecar: @ Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline)
+e2e-sidecar: deps-run build dapr-init
+	@set -euo pipefail; \
+	cleanup() { \
+		echo "Cleaning up..."; \
+		dapr stop -f . 2>/dev/null || true; \
+		for PORT in $(PORTS); do \
+			lsof -t -i:$$PORT 2>/dev/null | xargs -r kill -9 2>/dev/null || true; \
+		done; \
+		docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes 2>/dev/null || true; \
+	}; \
+	trap cleanup EXIT; \
+	echo "=== Starting Kafka in background ==="; \
+	docker compose --file docker-compose-kafka.yml up -d; \
+	echo "Waiting for Kafka broker (healthcheck)..."; \
+	for i in $$(seq 1 40); do \
+		if docker compose --file docker-compose-kafka.yml exec -T kafka \
+			kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then \
+			echo "Kafka is ready."; break; \
+		fi; \
+		sleep 3; \
+	done; \
+	echo "=== Starting producer + consumer via Dapr ==="; \
+	dapr run -f . > $(DAPR_LOG) 2>&1 & \
+	echo "Waiting for producer on :5232..."; \
+	for i in $$(seq 1 60); do \
+		curl -sf http://localhost:5232/dapr/config >/dev/null 2>&1 && break; \
+		sleep 2; \
+	done; \
+	echo "Waiting for consumer on :5231..."; \
+	for i in $$(seq 1 60); do \
+		STATUS=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5231/ 2>/dev/null); \
+		[ "$$STATUS" != "000" ] && break; \
+		sleep 2; \
+	done; \
+	echo "=== Services ready — running e2e sidecar tests ==="; \
+	DAPR_LOG=$(DAPR_LOG) bash e2e/e2e-sidecar.sh
+
 #ci-run: @ Run GitHub Actions workflow locally using act
 ci-run: deps-act
 	@docker container prune -f 2>/dev/null || true
@@ -310,5 +356,5 @@ renovate-validate: renovate-bootstrap
 
 .PHONY: help deps deps-docker deps-run deps-act deps-prune deps-prune-check clean format lint \
         vulncheck trivy-fs secrets mermaid-lint static-check build test e2e coverage-check \
-        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run \
+        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci e2e-sidecar ci-run \
         release renovate-bootstrap renovate-validate

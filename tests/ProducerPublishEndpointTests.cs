@@ -52,9 +52,18 @@ public class ProducerPublishEndpointTests
         var response = await _client.PostAsJsonAsync("/send", dto);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
-        A.CallTo(_fakeDaprClient)
-            .Where(call => call.Method.Name == nameof(DaprClient.PublishEventAsync))
-            .MustHaveHappened();
+
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(body).Contains("a1cdd036-c529-4bf9-bd59-d7148ef9237d");
+
+        A.CallTo(() => _fakeDaprClient.PublishEventAsync(
+                "message-pubsub-kafka",
+                "incoming-messages",
+                A<TinyMessage>.That.Matches(m =>
+                    m.Id == Guid.Parse("a1cdd036-c529-4bf9-bd59-d7148ef9237d") &&
+                    m.Type == "1"),
+                A<CancellationToken>.Ignored))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Test]
@@ -70,15 +79,31 @@ public class ProducerPublishEndpointTests
         var response = await _client.PostAsJsonAsync("/sendasbytes", dto);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(body).Contains("b1cdd036-c529-4bf9-bd59-d7148ef9237d");
+
         A.CallTo(_fakeDaprClient)
-            .Where(call => call.Method.Name == nameof(DaprClient.PublishByteEventAsync))
-            .MustHaveHappened();
+            .Where(call =>
+                call.Method.Name == nameof(DaprClient.PublishByteEventAsync) &&
+                call.Arguments.Get<string>(0) == "message-pubsub-kafka" &&
+                call.Arguments.Get<string>(1) == "incoming-messages")
+            .MustHaveHappenedOnceExactly();
     }
 
     [Test]
     public async Task PostSend_WithInvalidJson_Returns400()
     {
         var response = await _client.PostAsync("/send",
+            new StringContent("{not-json}", System.Text.Encoding.UTF8, "application/json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task PostSendAsBytes_WithInvalidJson_Returns400()
+    {
+        var response = await _client.PostAsync("/sendasbytes",
             new StringContent("{not-json}", System.Text.Encoding.UTF8, "application/json"));
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);

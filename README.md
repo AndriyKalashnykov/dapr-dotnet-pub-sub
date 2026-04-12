@@ -17,7 +17,7 @@ Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applicati
 | Framework | ASP.NET Core Web API |
 | Pub/Sub | [Dapr](https://dapr.io/) 1.17.8 (`Dapr.AspNetCore`) |
 | Message Broker | Apache Kafka (KRaft mode, Confluent images) |
-| Testing | [TUnit](https://tunit.dev/) 1.30.8 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
+| Testing | [TUnit](https://tunit.dev/) 1.31.0 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
 | Mocking | [FakeItEasy](https://fakeiteasy.github.io/) 9.0.1 |
 | Infrastructure | Docker Compose (Kafka + Kafka UI) |
 | CI/CD | GitHub Actions |
@@ -59,14 +59,13 @@ make kafka-start  # Kafka on :9092, Kafka UI on :9080
 In a second terminal, build and run the apps:
 
 ```bash
-make deps            # verify .NET SDK is installed
-make build           # restore and build the solution
-make test            # run unit tests (TUnit)
-make e2e             # run end-to-end tests (WebApplicationFactory)
-make coverage-check  # run all tests and enforce 80% line coverage
-make run             # start producer (:5232) + consumer (:5231) via Dapr
-make post            # send test messages to the producer
+make deps      # verify .NET SDK is installed
+make build     # restore and build the solution
+make run       # start producer (:5232) + consumer (:5231) via Dapr
+make post      # send test messages to the producer
 ```
+
+To run the full test suite: `make test` (unit), `make e2e` (endpoint), `make coverage-check` (80% threshold).
 
 ## Prerequisites
 
@@ -99,7 +98,8 @@ Run `make help` to see all available targets.
 | `make build` | Restore and build entire solution |
 | `make test` | Run unit tests (TinyMessageDto only) |
 | `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
-| `make coverage-check` | Run all tests with coverage and enforce 80% line threshold |
+| `make coverage-check` | Run full test suite with code coverage and enforce 80% threshold |
+| `make e2e-sidecar` | Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline) |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
 | `make post` | Send test messages to producer (requires `make run`) |
@@ -110,7 +110,7 @@ Run `make help` to see all available targets.
 | Target | Description |
 |--------|-------------|
 | `make format` | Auto-fix code formatting |
-| `make lint` | Check code style and compiler warnings |
+| `make lint` | Check code style and compiler warnings (format verify + warnings-as-errors) |
 | `make vulncheck` | Check for vulnerable NuGet packages |
 | `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
 | `make secrets` | Scan for committed secrets with gitleaks |
@@ -123,6 +123,7 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
+| `make dapr-init` | Initialize Dapr with pinned runtime version (idempotent) |
 | `make kafka-start` | Start Kafka stack (KRaft mode, foreground) |
 | `make kafka-stop` | Stop Kafka stack and remove volumes |
 | `make stop` | Stop Dapr and kill processes on known ports |
@@ -135,7 +136,6 @@ Run `make help` to see all available targets.
 |--------|-------------|
 | `make ci` | Run full CI pipeline (static-check, build, test, e2e, coverage-check) |
 | `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
-| `make dapr-init` | Install the pinned Dapr runtime version (idempotent) |
 
 ### Utilities
 
@@ -159,7 +159,8 @@ Four projects in `dapr-dotnet-pub-sub.slnx`:
 - **common/** — Shared library. Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic.
 - **producer/** — ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** — ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
-- **tests/** — TUnit test project. References common, producer, and consumer. Uses FakeItEasy for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing.
+- **tests/** — TUnit test project. References common, producer, and consumer. Uses FakeItEasy for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing. Includes error-path tests verifying DaprClient failure handling.
+- **e2e/** — Real-sidecar e2e test script. Exercises the full Producer → Kafka → Consumer pipeline through Dapr with subscription content-based routing verification.
 
 ### Message Routing (declarative subscription)
 

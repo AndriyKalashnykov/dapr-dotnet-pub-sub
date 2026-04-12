@@ -53,4 +53,22 @@ public class ConsumerEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
+
+    [Test]
+    public async Task PostHandleType1_WithInvalidJson_Returns400()
+    {
+        var response = await _client.PostAsync("/handletype1",
+            new StringContent("{not-json}", System.Text.Encoding.UTF8, "application/json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task PostHandleType1_WithEmptyBody_Returns400()
+    {
+        var response = await _client.PostAsync("/handletype1",
+            new StringContent("", System.Text.Encoding.UTF8, "application/json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
 }
