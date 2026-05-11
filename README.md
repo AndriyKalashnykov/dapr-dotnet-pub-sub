@@ -93,7 +93,10 @@ Four projects in `dapr-dotnet-pub-sub.slnx`:
 - **producer/** — ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** — ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
 - **tests/** — TUnit test project. References common, producer, and consumer. Uses FakeItEasy for mocking and `Microsoft.AspNetCore.Mvc.Testing` for web API testing. Includes error-path tests verifying DaprClient failure handling.
-- **e2e/** — Real-sidecar e2e test script. Exercises the full Producer → Kafka → Consumer pipeline through Dapr with subscription content-based routing verification.
+
+E2E orchestration lives outside the solution:
+
+- **scripts/** — `e2e-compose.sh` brings up `compose/docker-compose.yml` (Kafka + Dapr sidecars + producer/consumer images) and asserts subscription routing via consumer-container log polling. `kind-up.sh` / `kind-down.sh` / `e2e-kind.sh` do the K8s equivalent against a KinD cluster with cloud-provider-kind for LoadBalancer support.
 
 ### Message Routing (declarative subscription)
 
@@ -107,13 +110,15 @@ Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
 
 ### Dapr Components
 
-All components live in `components/`:
+Three component sets, one per deployment flow:
 
-- `kafka.yaml` — Kafka pubsub component (`message-pubsub-kafka`), broker at `localhost:9092`, scoped to producer + consumer
-- `subscription.yaml` — Declarative subscription with content-based routing rules
-- `dapr.yaml` — Dapr configuration (tracing, metrics)
+| Flow | Path | Broker address |
+|------|------|----------------|
+| Local Dapr CLI (`make run`) | `components/kafka.yaml` + `components/subscription.yaml` | `localhost:9092` |
+| Compose-based e2e (`make e2e`) | `compose/components/pubsub.yaml` + `compose/components/subscription.yaml` | `kafka:29092` |
+| KinD-based K8s e2e (`make kind-up`) | `k8s/pubsub.yaml` + `k8s/subscription.yaml` (Component + Subscription CRDs) | `kafka.dapr-pubsub.svc.cluster.local:9092` |
 
-The root-level `dapr.yaml` (not in `components/`) is the multi-app run template used by `dapr run -f .`.
+All three share the same Subscription routing rules; only the broker address and component-loading mechanism differ. The root-level `dapr.yaml` is the multi-app run template used by `dapr run -f .`.
 
 ### Port Assignments
 
@@ -124,12 +129,14 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 
 ### Infrastructure
 
-`compose/kafka-only.yml` runs Kafka in KRaft mode (no Zookeeper) for local Dapr-CLI flows (`make run`); the full app+sidecar Compose stack used by `make e2e` lives in `compose/docker-compose.yml`:
+`compose/kafka-only.yml` runs Kafka in KRaft mode (no Zookeeper) plus Kafka UI for local Dapr-CLI flows (`make run`):
 
 | Service  | Port | Purpose |
 |----------|------|---------|
 | Kafka    | 9092 | Message broker |
 | Kafka UI | 9080 | Web UI at <http://localhost:9080> |
+
+The full app+sidecar Compose stack used by `make e2e` lives in `compose/docker-compose.yml`. It includes Kafka but does not expose Kafka UI (the e2e flow doesn't need the UI; the broker is reached via the internal `kafka:29092` listener).
 
 ## Run all apps with multi-app run template file
 
@@ -279,7 +286,7 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **e2e-kind** | after `build` + `test` | `make kind-up && make e2e-kind` (KinD cluster + cloud-provider-kind + Helm-installed Dapr + Kafka manifest, asserts via LoadBalancer IP) |
 | **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed OR was cancelled (single branch-protection check) |
 
-`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both finish (it builds the producer/consumer images and brings up the full Compose stack — Kafka + Dapr sidecars + apps — to assert subscription delivery end-to-end). `ci-pass` gates on the full set so branch protection only needs to track a single check.
+`build` and `test` run in parallel after `static-check` passes. `e2e` (Compose) and `e2e-kind` (KinD) then run in parallel — the Compose path takes ~1 min on GitHub-hosted runners; the KinD path takes ~3 min because it bootstraps a real cluster, installs Dapr via Helm, and waits for the producer LoadBalancer route. `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 
