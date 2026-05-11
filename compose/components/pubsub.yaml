@@ -7,7 +7,7 @@ spec:
   version: v1
   metadata:
     - name: brokers
-      value: "localhost:9092"
+      value: "kafka:29092"
     - name: consumerGroup
       value: "order-group"
     - name: authType
@@ -16,9 +16,10 @@ spec:
       value: "dapr-pubsub-client"
     - name: disableTls
       value: "true"
-    # Read from the topic start so e2e suites catch messages even if the
-    # consumer's Kafka group rebalance lags publish (default 'newest' silently
-    # drops pre-subscribe messages).
+    # Read from the topic start so the e2e suite catches messages even if the
+    # consumer's Kafka group rebalance lags publish — by default Dapr uses
+    # 'newest', which silently drops messages published before the subscriber
+    # finishes joining the group.
     - name: initialOffset
       value: "oldest"
 scopes:

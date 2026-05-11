@@ -80,6 +80,11 @@ app.MapPost("/send", async (
     }
 );
 
+// Serialize with camelCase so the byte payload matches CloudEvent-wrapped
+// publishes (Dapr camelCases by default) and the declarative subscription's
+// `event.data.type` lookup resolves on the consumer side.
+var bytePayloadOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
 app.MapPost("/sendasbytes", async (
         TinyMessageDto messageDto,
         DaprClient daprClient,
@@ -88,11 +93,12 @@ app.MapPost("/sendasbytes", async (
     try
     {
         var message = messageDto.ToMessage();
-        var content = JsonSerializer.SerializeToUtf8Bytes(message);
+        var content = JsonSerializer.SerializeToUtf8Bytes(message, bytePayloadOptions);
         await daprClient.PublishByteEventAsync(
             pubsubName: PubSubComponentName,
             topicName: TopicName,
-            data: content.AsMemory());
+            data: content.AsMemory(),
+            dataContentType: "application/json");
         Console.WriteLine($"Sent message {message.Id}.");
 
         return Results.Accepted(string.Empty, message.Id);

@@ -273,10 +273,18 @@ dapr-init: deps-run
 		dapr init --runtime-version $(DAPR_RUNTIME_VERSION); \
 	fi
 
+#image-build: @ Build producer and consumer Docker images (used by e2e)
+image-build: deps-docker
+	@docker compose --file compose/docker-compose.yml build producer consumer
+
+#e2e: @ Run Compose-based e2e (Kafka + producer/consumer + Dapr sidecars in containers)
+e2e: deps-docker image-build
+	@bash scripts/e2e-compose.sh
+
 DAPR_LOG := /tmp/dapr-e2e.log
 
-#e2e: @ Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline)
-e2e: deps-run build dapr-init
+#e2e-sidecar: @ Run legacy real-sidecar e2e (dapr run -f .) — kept for local-only flows without Docker images
+e2e-sidecar: deps-run build dapr-init
 	@set -euo pipefail; \
 	cleanup() { \
 		echo "Cleaning up..."; \
@@ -310,7 +318,7 @@ e2e: deps-run build dapr-init
 		[ "$$STATUS" != "000" ] && break; \
 		sleep 2; \
 	done; \
-	echo "=== Services ready — running e2e sidecar tests ==="; \
+	echo "=== Services ready — running legacy e2e sidecar tests ==="; \
 	DAPR_LOG=$(DAPR_LOG) bash e2e/e2e-sidecar.sh
 
 #ci-run: @ Run GitHub Actions workflow locally using act
@@ -320,7 +328,7 @@ ci-run: deps-act
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
-	for j in changes static-check build test ci-pass; do \
+	for j in changes static-check build test e2e ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
 			--container-architecture linux/amd64 \
@@ -359,6 +367,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
-        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e coverage-check \
-        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run \
-        release renovate-bootstrap renovate-validate
+        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e e2e-sidecar \
+        image-build coverage-check dapr-init update run post stop stop-dapr stop-apps kafka-start \
+        kafka-stop ci ci-run release renovate-bootstrap renovate-validate

@@ -1,0 +1,104 @@
+name: dapr-pubsub-e2e
+
+services:
+
+  kafka:
+    image: confluentinc/cp-kafka:8.2.0@sha256:acbbf674f2ed40e5d0a8ca51beb0f00692c866fc22b5ce06f8cadbdc54cd4436
+    container_name: e2e-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_LOG4J_ROOT_LOGLEVEL: ERROR
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:29092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  placement:
+    image: daprio/dapr:1.17.4
+    container_name: e2e-placement
+    command: ["./placement", "--port", "50006"]
+
+  producer:
+    image: dapr-dotnet-pub-sub-producer:e2e
+    build:
+      context: ..
+      dockerfile: producer/Dockerfile
+    container_name: e2e-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5232:5232"
+    environment:
+      DAPR_APP_PORT: "5232"
+      DAPR_HTTP_PORT: "3532"
+
+  producer-dapr:
+    image: daprio/daprd:1.17.4
+    container_name: e2e-producer-dapr
+    network_mode: "service:producer"
+    depends_on:
+      - producer
+      - placement
+      - kafka
+    volumes:
+      - ./components:/components:ro
+    command:
+      - "./daprd"
+      - "--app-id=producer"
+      - "--app-port=5232"
+      - "--dapr-http-port=3532"
+      - "--placement-host-address=placement:50006"
+      - "--resources-path=/components"
+      - "--log-level=info"
+
+  consumer:
+    image: dapr-dotnet-pub-sub-consumer:e2e
+    build:
+      context: ..
+      dockerfile: consumer/Dockerfile
+    container_name: e2e-consumer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5231:5231"
+    environment:
+      DAPR_APP_PORT: "5231"
+      DAPR_HTTP_PORT: "3531"
+
+  consumer-dapr:
+    image: daprio/daprd:1.17.4
+    container_name: e2e-consumer-dapr
+    network_mode: "service:consumer"
+    depends_on:
+      - consumer
+      - placement
+      - kafka
+    volumes:
+      - ./components:/components:ro
+    command:
+      - "./daprd"
+      - "--app-id=consumer"
+      - "--app-port=5231"
+      - "--dapr-http-port=3531"
+      - "--placement-host-address=placement:50006"
+      - "--resources-path=/components"
+      - "--log-level=info"
+
+networks:
+  default:
+    name: dapr-pubsub-e2e

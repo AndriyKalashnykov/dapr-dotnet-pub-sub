@@ -1,0 +1,16 @@
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: consumer-sub
+spec:
+  pubsubname: message-pubsub-kafka
+  topic: incoming-messages
+  routes:
+    rules:
+      - match: event.data.type == "1"
+        path: /handletype1
+      - match: event.data.type == "2"
+        path: /handletype2
+    default: /dafault-messagehandler
+scopes:
+  - consumer

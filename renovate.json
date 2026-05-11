@@ -20,10 +20,22 @@
   "enabledManagers": [
     "github-actions",
     "nuget",
+    "dockerfile",
     "docker-compose",
     "mise",
     "custom.regex"
   ],
+  "dockerfile": {
+    "managerFilePatterns": [
+      "/(^|/)Dockerfile(\\..+)?$/"
+    ]
+  },
+  "docker-compose": {
+    "managerFilePatterns": [
+      "/(^|/)docker-compose[^/]*\\.ya?ml$/",
+      "/^compose/docker-compose\\.ya?ml$/"
+    ]
+  },
   "vulnerabilityAlerts": {
     "labels": [
       "security"
@@ -80,6 +92,23 @@
         "mise"
       ],
       "groupName": "mise tools"
+    },
+    {
+      "description": "Group Dapr runtime container images (daprd, placement, dapr)",
+      "matchPackageNames": [
+        "daprio/daprd",
+        "daprio/dapr",
+        "daprio/placement"
+      ],
+      "groupName": "Dapr runtime images"
+    },
+    {
+      "description": "Group .NET base images (sdk, aspnet)",
+      "matchPackageNames": [
+        "mcr.microsoft.com/dotnet/sdk",
+        "mcr.microsoft.com/dotnet/aspnet"
+      ],
+      "groupName": ".NET base images"
     }
   ],
   "customManagers": [

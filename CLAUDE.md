@@ -29,7 +29,9 @@ make build                    # Restore + build entire solution
 make test                     # Run unit tests (Category=Unit, seconds)
 make integration-test         # Run integration tests (Category=Integration, in-process WebApplicationFactory)
 make coverage-check           # Run full suite with coverage and enforce 80% line threshold
-make e2e                      # Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline)
+make image-build              # Build producer + consumer Docker images (used by e2e)
+make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + producer/consumer as containers)
+make e2e-sidecar              # Legacy real-sidecar e2e via dapr run -f . (Docker-image-free local fallback)
 make dapr-init                # Install pinned Dapr runtime (idempotent)
 make update                   # Update NuGet packages to latest versions
 make run                      # Build, stop previous, then run both apps via `dapr run -f .`
@@ -92,7 +94,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Dapr SDK: `Dapr.AspNetCore` 1.17.8
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload); there is no separate `coverage` or `e2e` job — the real-sidecar `make e2e` is local-only until the Dockerize-e2e backlog item replaces it with a Compose-based flow CI can run.
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e` → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars).
 - Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
 - Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.
@@ -106,7 +108,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 
 ## Upgrade Backlog
 
-- [ ] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — Create Dockerfiles for producer and consumer, build images, and run them in Docker Compose alongside Kafka (and Dapr sidecars as containers). The `e2e-sidecar` target currently backgrounds `dapr run -f .` and greps its log file, which is fragile (process lifecycle, log race). A Compose-based approach (`docker compose up -d --wait`, curl, `docker compose down`) is deterministic, isolated, and CI-friendly. Targets: `image-build`, `e2e-compose`. Use `/harden-image-pipeline` skill for Dockerfile conventions.
+- [x] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — `compose/docker-compose.yml` brings up Kafka + Dapr sidecars (`network_mode: service:<app>`) + producer/consumer as containers; `scripts/e2e-compose.sh` asserts subscription routing via consumer-container log polling. `make image-build` builds the images; `make e2e` runs the full flow. `make e2e-sidecar` retained as the Docker-image-free fallback. The legacy `dapr run -f .` log-grep approach is gone from the e2e job.
 - [ ] **K8s e2e: deploy to KinD + cloud-provider-kind and run tests** — After Dockerfiles exist (previous item), create K8s manifests (`k8s/`) for producer, consumer, and Dapr components. Deploy onto a KinD cluster with cloud-provider-kind (for `ServiceType: LoadBalancer`) and Dapr installed via Helm. Run the e2e test script against the LoadBalancer IP. This validates manifest wiring, sidecar injection, service discovery, and subscription routing in a real cluster. Targets: `kind-up`, `kind-down`, `e2e` (promoted to KinD-based). Use `/makefile` skill Kubernetes Targets section for conventions.
 
 ## Skills

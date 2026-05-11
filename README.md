@@ -208,7 +208,9 @@ Run `make help` to see all available targets.
 | `make build` | Restore and build entire solution |
 | `make test` | Run unit tests (Category=Unit, seconds) |
 | `make integration-test` | Run integration tests (Category=Integration, in-process `WebApplicationFactory`) |
-| `make e2e` | Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline) |
+| `make image-build` | Build producer + consumer Docker images |
+| `make e2e` | Run Compose-based e2e (Kafka + Dapr sidecars + apps as containers) |
+| `make e2e-sidecar` | Legacy real-sidecar e2e via `dapr run -f .` (kept for Docker-image-free local flows) |
 | `make coverage-check` | Run full test suite with code coverage and enforce 80% threshold |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
@@ -271,9 +273,10 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **static-check** | after `changes` (when `code==true`) | `make static-check` (composite quality gate) |
 | **build** | after `static-check` | `make build` |
 | **test** | after `static-check` | `make coverage-check` (runs all `Category=Unit` + `Category=Integration` tests, enforces 80% line threshold, uploads cobertura artifact) |
+| **e2e** | after `build` + `test` | `make e2e` (Compose-based: producer/consumer Docker images + Dapr sidecars + Kafka, asserts subscription delivery) |
 | **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed OR was cancelled (single branch-protection check) |
 
-`build` and `test` run in parallel after `static-check` passes. The real-sidecar `make e2e` is not exercised in CI yet — it depends on Kafka + Dapr runtime which the Dockerize-e2e backlog item replaces with a Compose-based pipeline. `ci-pass` gates on the full set so branch protection only needs to track a single check.
+`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both finish (it builds the producer/consumer images and brings up the full Compose stack — Kafka + Dapr sidecars + apps — to assert subscription delivery end-to-end). `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 
