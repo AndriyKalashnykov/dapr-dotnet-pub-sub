@@ -17,10 +17,10 @@ assert_status() {
     status=$(curl "${opts[@]}" "$url")
     if [[ "$status" == "$expected" ]]; then
         echo "PASS: $method $url -> $status"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "FAIL: $method $url -> $status (expected $expected)"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 }
 
@@ -28,10 +28,10 @@ assert_log_contains() {
     local label="$1" pattern="$2"
     if grep -q "$pattern" "$DAPR_LOG"; then
         echo "PASS: log contains '$label'"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "FAIL: log missing '$label'"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 }
 
@@ -49,6 +49,10 @@ assert_status POST "$PRODUCER_URL/send" 202 \
 
 assert_status POST "$PRODUCER_URL/send" 202 \
     '{"id":"e2e00003-0000-0000-0000-000000000003","timeStamp":"2025-09-26T02:52:04.835Z","type":"0"}'
+
+# Unknown type — must also fall through to /dafault-messagehandler.
+assert_status POST "$PRODUCER_URL/send" 202 \
+    '{"id":"e2e00005-0000-0000-0000-000000000005","timeStamp":"2025-09-26T02:52:04.835Z","type":"99"}'
 
 echo ""
 echo "--- Publishing messages via /sendasbytes ---"
@@ -81,6 +85,10 @@ assert_log_contains \
 assert_log_contains \
     "type '0' routed to /dafault-messagehandler" \
     "/dafault-messagehandler - Received message e2e00003"
+
+assert_log_contains \
+    "unknown type '99' routed to /dafault-messagehandler" \
+    "/dafault-messagehandler - Received message e2e00005"
 
 assert_log_contains \
     "bytes type '1' routed to /handletype1" \

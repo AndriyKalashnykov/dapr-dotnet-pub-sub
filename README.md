@@ -62,7 +62,7 @@ make run       # start producer (:5232) + consumer (:5231) via Dapr
 make post      # send test messages to the producer
 ```
 
-To run the full test suite: `make test` (unit), `make e2e` (endpoint), `make coverage-check` (80% threshold).
+To run the test pyramid: `make test` (unit, seconds), `make integration-test` (in-process API, seconds), `make e2e` (real Dapr + Kafka, minutes), `make coverage-check` (full suite + 80% threshold).
 
 ## Prerequisites
 
@@ -206,10 +206,10 @@ Run `make help` to see all available targets.
 | Target | Description |
 |--------|-------------|
 | `make build` | Restore and build entire solution |
-| `make test` | Run unit tests (TinyMessageDto only) |
-| `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
+| `make test` | Run unit tests (Category=Unit, seconds) |
+| `make integration-test` | Run integration tests (Category=Integration, in-process `WebApplicationFactory`) |
+| `make e2e` | Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline) |
 | `make coverage-check` | Run full test suite with code coverage and enforce 80% threshold |
-| `make e2e-sidecar` | Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline) |
 | `make clean` | Remove build artifacts |
 | `make run` | Build, stop previous, and run both apps via Dapr |
 | `make post` | Send test messages to producer (requires `make run`) |
@@ -244,7 +244,7 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |--------|-------------|
-| `make ci` | Run full CI pipeline (static-check, build, test, e2e, coverage-check) |
+| `make ci` | Run full CI pipeline (static-check, build, test, integration-test, coverage-check) |
 | `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
 
 ### Utilities
@@ -270,11 +270,10 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **changes** | push, PR, tags | `dorny/paths-filter` — outputs `code=true` when non-doc files change |
 | **static-check** | after `changes` (when `code==true`) | `make static-check` (composite quality gate) |
 | **build** | after `static-check` | `make build` |
-| **test** | after `static-check` | `make coverage-check` (runs the full suite + enforces 80% line threshold; uploads cobertura artifact) |
-| **e2e** | after `build` + `test` | `make e2e` (WebApplicationFactory endpoint tests) |
+| **test** | after `static-check` | `make coverage-check` (runs all `Category=Unit` + `Category=Integration` tests, enforces 80% line threshold, uploads cobertura artifact) |
 | **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed OR was cancelled (single branch-protection check) |
 
-`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
+`build` and `test` run in parallel after `static-check` passes. The real-sidecar `make e2e` is not exercised in CI yet — it depends on Kafka + Dapr runtime which the Dockerize-e2e backlog item replaces with a Compose-based pipeline. `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 

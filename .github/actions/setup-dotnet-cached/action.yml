@@ -1,0 +1,11 @@
+name: Setup .NET (cached)
+description: Install the .NET SDK pinned by global.json with NuGet package cache enabled.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+        cache: true
+        cache-dependency-path: '**/packages.lock.json'

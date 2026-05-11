@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Tests;
 
+[Category("Integration")]
 public class ProducerPublishEndpointTests
 {
     private static WebApplicationFactory<Producer.Program> _factory = null!;
@@ -107,5 +108,25 @@ public class ProducerPublishEndpointTests
             new StringContent("{not-json}", System.Text.Encoding.UTF8, "application/json"));
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task PostSend_WithEmptyBody_Returns400()
+    {
+        var response = await _client.PostAsync("/send",
+            new StringContent("", System.Text.Encoding.UTF8, "application/json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task PostSend_WithTextPlainContentType_Returns415()
+    {
+        // Endpoint accepts application/json only — non-JSON content-types must
+        // be rejected at the negotiation layer rather than reach the handler.
+        var response = await _client.PostAsync("/send",
+            new StringContent("hello", System.Text.Encoding.UTF8, "text/plain"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.UnsupportedMediaType);
     }
 }

@@ -2,6 +2,7 @@ using Common;
 
 namespace Tests;
 
+[Category("Unit")]
 public class TinyMessageDtoTests
 {
     [Test]

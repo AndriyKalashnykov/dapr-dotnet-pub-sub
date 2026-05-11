@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Tests;
 
+[Category("Integration")]
 public class ProducerEndpointTests
 {
     private static WebApplicationFactory<Producer.Program> _factory = null!;

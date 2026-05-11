@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Tests;
 
+[Category("Integration")]
 public class ProducerErrorPathTests
 {
     private static WebApplicationFactory<Producer.Program> _factory = null!;
@@ -61,6 +62,8 @@ public class ProducerErrorPathTests
         var response = await _client.PostAsJsonAsync("/send", dto);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.InternalServerError);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType)
+            .IsEqualTo("application/problem+json");
         var body = await response.Content.ReadAsStringAsync();
         await Assert.That(body).Contains("Failed to publish message");
         await Assert.That(body).Contains("Sidecar unavailable");
@@ -79,6 +82,8 @@ public class ProducerErrorPathTests
         var response = await _client.PostAsJsonAsync("/sendasbytes", dto);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.InternalServerError);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType)
+            .IsEqualTo("application/problem+json");
         var body = await response.Content.ReadAsStringAsync();
         await Assert.That(body).Contains("Failed to publish message");
         await Assert.That(body).Contains("Sidecar unavailable");

@@ -26,10 +26,10 @@ make deps-prune               # Show redundant NuGet package references
 make deps-prune-check         # Verify no redundant NuGet package references
 make static-check             # Composite gate: lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
 make build                    # Restore + build entire solution
-make test                     # Run unit tests (TinyMessageDtoTests only)
-make e2e                      # Run end-to-end tests (Producer/Consumer via WebApplicationFactory)
-make coverage-check           # Run all tests with coverage and enforce 80% line threshold
-make e2e-sidecar              # Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline)
+make test                     # Run unit tests (Category=Unit, seconds)
+make integration-test         # Run integration tests (Category=Integration, in-process WebApplicationFactory)
+make coverage-check           # Run full suite with coverage and enforce 80% line threshold
+make e2e                      # Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline)
 make dapr-init                # Install pinned Dapr runtime (idempotent)
 make update                   # Update NuGet packages to latest versions
 make run                      # Build, stop previous, then run both apps via `dapr run -f .`
@@ -39,7 +39,7 @@ make stop-dapr                # Stop Dapr multi-app run
 make stop-apps PORTS="..."    # Kill processes on given ports
 make kafka-start              # Start Kafka stack (KRaft mode, Kafka UI) — foreground
 make kafka-stop               # Stop Kafka stack and remove volumes
-make ci                       # Run full CI pipeline (static-check, build, test, e2e, coverage-check)
+make ci                       # Run full CI pipeline (static-check, build, test, integration-test, coverage-check)
 make ci-run                   # Run GitHub Actions workflow locally using act
 make release VERSION=vX.Y.Z   # Create a semver-validated release tag
 make renovate-bootstrap       # Install Node (via mise) for Renovate
@@ -55,8 +55,8 @@ Build a single project: `dotnet build producer/producer.csproj` (the solution fi
 - **common/** -- Shared library (`OutputType: Library`). Contains `TinyMessage` record and `TinyMessageDto` with parsing/validation logic. Referenced by both apps.
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** -- ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
-- **tests/** -- TUnit test project. References common, producer, and consumer projects. `TinyMessageDtoTests` are unit tests (run via `make test`); `ProducerEndpointTests`, `ProducerPublishEndpointTests`, `ProducerErrorPathTests`, and `ConsumerEndpointTests` are end-to-end tests using `WebApplicationFactory<Program>` (run via `make e2e`). `ProducerPublishEndpointTests` replaces the real `DaprClient` with a FakeItEasy fake to exercise the `/send` and `/sendasbytes` publish paths without a running sidecar. `ProducerErrorPathTests` verifies error handling when `DaprClient` throws.
-- **e2e/** -- Real-sidecar e2e test script (`e2e-sidecar.sh`). Run via `make e2e-sidecar`, which starts Kafka, initializes Dapr, launches both apps, publishes messages with different types, and verifies subscription content-based routing delivers each message to the correct consumer handler.
+- **tests/** -- TUnit test project. References common, producer, and consumer projects. Test classes are tagged with `[Category("Unit")]` or `[Category("Integration")]`; `make test` filters to Unit, `make integration-test` filters to Integration. `TinyMessageDtoTests` are unit tests; `ProducerEndpointTests`, `ProducerPublishEndpointTests`, `ProducerErrorPathTests`, and `ConsumerEndpointTests` are integration tests using `WebApplicationFactory<Program>`. `ProducerPublishEndpointTests` replaces the real `DaprClient` with a FakeItEasy fake to exercise the `/send` and `/sendasbytes` publish paths without a running sidecar. `ProducerErrorPathTests` verifies error handling (including `application/problem+json` Content-Type) when `DaprClient` throws. `ConsumerEndpointTests` covers both raw-JSON and `application/cloudevents+json` envelope paths.
+- **e2e/** -- Real-sidecar e2e test script (`e2e-sidecar.sh`). Run via `make e2e`, which starts Kafka, initializes Dapr, launches both apps, publishes messages with different types (1, 2, 0, 99), and verifies subscription content-based routing delivers each message to the correct consumer handler. Type 99 covers the default-route fall-through.
 
 ### Message routing (declarative subscription)
 
@@ -92,7 +92,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Dapr SDK: `Dapr.AspNetCore` 1.17.8
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e` → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (full suite + 80% line threshold + cobertura artifact upload); there is no separate `coverage` job.
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload); there is no separate `coverage` or `e2e` job — the real-sidecar `make e2e` is local-only until the Dockerize-e2e backlog item replaces it with a Compose-based flow CI can run.
 - Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
 - Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.

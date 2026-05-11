@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using Common;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Tests;
 
+[Category("Integration")]
 public class ConsumerEndpointTests
 {
     private static WebApplicationFactory<Consumer.Program> _factory = null!;
@@ -70,5 +72,34 @@ public class ConsumerEndpointTests
             new StringContent("", System.Text.Encoding.UTF8, "application/json"));
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task PostHandleType1_WithCloudEventEnvelope_UnwrapsAndReturns202()
+    {
+        // Production traffic arrives via Dapr as CloudEvents (RFC 7807) wrapped
+        // in application/cloudevents+json. UseCloudEvents() unwraps `data` before
+        // model binding. This test verifies that path — not just the raw-JSON path.
+        var id = Guid.NewGuid();
+        var ts = DateTimeOffset.UtcNow.ToString("O");
+        var cloudEvent = $$"""
+            {
+              "specversion": "1.0",
+              "type": "com.dapr.event.sent",
+              "source": "producer",
+              "id": "{{Guid.NewGuid()}}",
+              "datacontenttype": "application/json",
+              "data": {
+                "id": "{{id}}",
+                "timeStamp": "{{ts}}",
+                "type": "1"
+              }
+            }
+            """;
+
+        var response = await _client.PostAsync("/handletype1",
+            new StringContent(cloudEvent, Encoding.UTF8, "application/cloudevents+json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
 }

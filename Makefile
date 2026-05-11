@@ -176,13 +176,13 @@ build: deps
 	@dotnet restore $(SOLUTION)
 	@dotnet build $(SOLUTION)
 
-#test: @ Run unit tests (TinyMessageDto only)
+#test: @ Run unit tests (Category=Unit)
 test: deps
-	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/TinyMessageDtoTests/*"
+	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/*/*[Category=Unit]"
 
-#e2e: @ Run end-to-end tests (Producer/Consumer via WebApplicationFactory)
-e2e: deps
-	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/*EndpointTests/*"
+#integration-test: @ Run integration tests (Category=Integration, in-process WebApplicationFactory)
+integration-test: deps
+	@dotnet run --project tests/tests.csproj -- --treenode-filter "/*/*/*/*[Category=Integration]"
 
 #coverage-check: @ Run full test suite with code coverage and enforce 80% threshold
 coverage-check: deps
@@ -257,8 +257,8 @@ kafka-start: deps deps-docker
 kafka-stop:
 	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
 
-#ci: @ Run full CI pipeline (static-check, build, test, e2e, coverage-check)
-ci: static-check build test e2e coverage-check
+#ci: @ Run full CI pipeline (static-check, build, test, integration-test, coverage-check)
+ci: static-check build test integration-test coverage-check
 	@echo "CI pipeline passed."
 
 #dapr-init: @ Initialize Dapr with pinned runtime version (idempotent)
@@ -275,8 +275,8 @@ dapr-init: deps-run
 
 DAPR_LOG := /tmp/dapr-e2e.log
 
-#e2e-sidecar: @ Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline)
-e2e-sidecar: deps-run build dapr-init
+#e2e: @ Run real-sidecar e2e tests (starts Kafka + Dapr, exercises full pub/sub pipeline)
+e2e: deps-run build dapr-init
 	@set -euo pipefail; \
 	cleanup() { \
 		echo "Cleaning up..."; \
@@ -320,7 +320,7 @@ ci-run: deps-act
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
-	for j in changes static-check build test e2e ci-pass; do \
+	for j in changes static-check build test ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
 			--container-architecture linux/amd64 \
@@ -359,6 +359,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
-        vulncheck trivy-fs secrets mermaid-lint static-check build test e2e coverage-check \
-        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci e2e-sidecar ci-run \
+        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e coverage-check \
+        dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci ci-run \
         release renovate-bootstrap renovate-validate
