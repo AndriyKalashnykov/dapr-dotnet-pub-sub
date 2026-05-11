@@ -31,7 +31,6 @@ make integration-test         # Run integration tests (Category=Integration, in-
 make coverage-check           # Run full suite with coverage and enforce 80% line threshold
 make image-build              # Build producer + consumer Docker images (used by e2e)
 make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + producer/consumer as containers)
-make e2e-sidecar              # Legacy real-sidecar e2e via dapr run -f . (Docker-image-free local fallback)
 make kind-up                  # Create KinD cluster with Dapr + Kafka + apps + cloud-provider-kind
 make kind-down                # Tear down KinD cluster + cloud-provider-kind orphans
 make e2e-kind                 # Run K8s e2e against KinD LoadBalancer IP (requires kind-up)
@@ -61,7 +60,7 @@ Build a single project: `dotnet build producer/producer.csproj` (the solution fi
 - **producer/** -- ASP.NET Web API. Exposes `POST /send` (JSON publish) and `POST /sendasbytes` (byte publish). Uses `DaprClient.PublishEventAsync` to publish to the `message-pubsub-kafka` component on topic `incoming-messages`.
 - **consumer/** -- ASP.NET Web API. Receives messages via Dapr subscription. Uses `CloudEvents` middleware and MVC controllers for subscription endpoint mapping.
 - **tests/** -- TUnit test project. References common, producer, and consumer projects. Test classes are tagged with `[Category("Unit")]` or `[Category("Integration")]`; `make test` filters to Unit, `make integration-test` filters to Integration. `TinyMessageDtoTests` are unit tests; `ProducerEndpointTests`, `ProducerPublishEndpointTests`, `ProducerErrorPathTests`, and `ConsumerEndpointTests` are integration tests using `WebApplicationFactory<Program>`. `ProducerPublishEndpointTests` replaces the real `DaprClient` with a FakeItEasy fake to exercise the `/send` and `/sendasbytes` publish paths without a running sidecar. `ProducerErrorPathTests` verifies error handling (including `application/problem+json` Content-Type) when `DaprClient` throws. `ConsumerEndpointTests` covers both raw-JSON and `application/cloudevents+json` envelope paths.
-- **e2e/** -- Real-sidecar e2e test script (`e2e-sidecar.sh`). Run via `make e2e`, which starts Kafka, initializes Dapr, launches both apps, publishes messages with different types (1, 2, 0, 99), and verifies subscription content-based routing delivers each message to the correct consumer handler. Type 99 covers the default-route fall-through.
+- **scripts/** -- E2E orchestration. `e2e-compose.sh` brings up `compose/docker-compose.yml` (Kafka + Dapr sidecars + producer/consumer images), exercises the publish path, and asserts subscription routing via consumer-container log polling (types 1, 2, 0, 99 + bytes 1; type 99 covers the default-route fall-through). `kind-up.sh` / `kind-down.sh` / `e2e-kind.sh` do the K8s equivalent against a KinD cluster with cloud-provider-kind for LoadBalancer support.
 
 ### Message routing (declarative subscription)
 
@@ -87,9 +86,9 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 | producer | 5232     | 3532               |
 | consumer | 5231     | 3531               |
 
-### Infrastructure (docker-compose-kafka.yml)
+### Infrastructure
 
-Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
+`compose/kafka-only.yml` runs Kafka in KRaft mode (no Zookeeper) for `make run` (Dapr-CLI multi-app flow): Kafka (:9092), Kafka UI (:9080). The full app+sidecar Compose stack used by `make e2e` lives in `compose/docker-compose.yml`.
 
 ## Tech Stack
 
@@ -111,7 +110,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 
 ## Upgrade Backlog
 
-- [x] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — `compose/docker-compose.yml` brings up Kafka + Dapr sidecars (`network_mode: service:<app>`) + producer/consumer as containers; `scripts/e2e-compose.sh` asserts subscription routing via consumer-container log polling. `make image-build` builds the images; `make e2e` runs the full flow. `make e2e-sidecar` retained as the Docker-image-free fallback. The legacy `dapr run -f .` log-grep approach is gone from the e2e job.
+- [x] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — `compose/docker-compose.yml` brings up Kafka + Dapr sidecars (`network_mode: service:<app>`) + producer/consumer as containers; `scripts/e2e-compose.sh` asserts subscription routing via consumer-container log polling. `make image-build` builds the images; `make e2e` runs the full flow. The legacy `dapr run -f .` log-grep approach has been removed entirely.
 - [x] **K8s e2e: deploy to KinD + cloud-provider-kind and run tests** — `k8s/` manifests cover namespace, Kafka (KRaft StatefulSet using `confluentinc/cp-kafka`), Dapr Component + Subscription CRDs, and producer/consumer Deployments with `dapr.io/enabled` annotations. `scripts/kind-up.sh` creates the cluster, starts host cloud-provider-kind, installs Dapr via Helm, applies manifests, and waits for the producer LoadBalancer route. `scripts/e2e-kind.sh` asserts via `kubectl logs` polling. The `e2e-kind` CI job runs alongside `e2e` (Compose).
 
 ## Skills

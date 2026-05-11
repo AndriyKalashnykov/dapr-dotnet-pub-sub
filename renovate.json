@@ -33,7 +33,7 @@
   "docker-compose": {
     "managerFilePatterns": [
       "/(^|/)docker-compose[^/]*\\.ya?ml$/",
-      "/^compose/docker-compose\\.ya?ml$/"
+      "/^compose/[^/]+\\.ya?ml$/"
     ]
   },
   "vulnerabilityAlerts": {

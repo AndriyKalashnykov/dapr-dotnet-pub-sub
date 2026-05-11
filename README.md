@@ -5,7 +5,7 @@
 
 # Dapr Pub/Sub on .NET 10 — Reference Service
 
-The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka. The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a real-sidecar e2e harness (`make e2e-sidecar`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy fs scan, gitleaks, Mermaid lint, dependency pruning) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
+The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka. The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a Compose-based real-sidecar e2e (`make e2e`), a KinD-based K8s e2e (`make kind-up && make e2e-kind`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy fs scan, gitleaks, Mermaid lint, dependency pruning) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
 
 ```mermaid
 C4Container
@@ -124,7 +124,7 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 
 ### Infrastructure
 
-`docker-compose-kafka.yml` runs Kafka in KRaft mode (no Zookeeper):
+`compose/kafka-only.yml` runs Kafka in KRaft mode (no Zookeeper) for local Dapr-CLI flows (`make run`); the full app+sidecar Compose stack used by `make e2e` lives in `compose/docker-compose.yml`:
 
 | Service  | Port | Purpose |
 |----------|------|---------|
@@ -210,7 +210,6 @@ Run `make help` to see all available targets.
 | `make integration-test` | Run integration tests (Category=Integration, in-process `WebApplicationFactory`) |
 | `make image-build` | Build producer + consumer Docker images |
 | `make e2e` | Run Compose-based e2e (Kafka + Dapr sidecars + apps as containers) |
-| `make e2e-sidecar` | Legacy real-sidecar e2e via `dapr run -f .` (kept for Docker-image-free local flows) |
 | `make kind-up` | Create a KinD cluster with cloud-provider-kind + Dapr (Helm) + Kafka + producer/consumer applied |
 | `make kind-down` | Tear down the KinD cluster + cloud-provider-kind (also prunes `kindccm-*` orphans) |
 | `make e2e-kind` | Run the K8s e2e against the KinD cluster LoadBalancer IP (requires `kind-up` first) |

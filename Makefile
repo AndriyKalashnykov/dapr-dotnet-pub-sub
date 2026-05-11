@@ -260,11 +260,11 @@ stop: stop-dapr stop-apps
 
 #kafka-start: @ Start Kafka stack (KRaft mode, foreground)
 kafka-start: deps deps-docker
-	@docker compose --file docker-compose-kafka.yml up
+	@docker compose --file compose/kafka-only.yml up
 
 #kafka-stop: @ Stop Kafka stack and remove volumes
 kafka-stop:
-	@docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes
+	@docker compose --file compose/kafka-only.yml down --remove-orphans --volumes
 
 #ci: @ Run full CI pipeline (static-check, build, test, integration-test, coverage-check)
 ci: static-check build test integration-test coverage-check
@@ -291,6 +291,7 @@ e2e: deps-docker image-build
 	@bash scripts/e2e-compose.sh
 
 #kind-up: @ Create KinD cluster with Dapr + Kafka + producer/consumer (uses cloud-provider-kind for LoadBalancer)
+
 kind-up: deps-docker deps-tools image-build
 	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) \
 	 KIND_NODE_IMAGE=$(KIND_NODE_IMAGE) \
@@ -304,46 +305,6 @@ kind-down:
 #e2e-kind: @ Run K8s e2e against the KinD cluster (requires kind-up)
 e2e-kind: deps-docker deps-tools
 	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) bash scripts/e2e-kind.sh
-
-DAPR_LOG := /tmp/dapr-e2e.log
-
-#e2e-sidecar: @ Run legacy real-sidecar e2e (dapr run -f .) — kept for local-only flows without Docker images
-e2e-sidecar: deps-run build dapr-init
-	@set -euo pipefail; \
-	cleanup() { \
-		echo "Cleaning up..."; \
-		dapr stop -f . 2>/dev/null || true; \
-		for PORT in $(PORTS); do \
-			lsof -t -i:$$PORT 2>/dev/null | xargs -r kill -9 2>/dev/null || true; \
-		done; \
-		docker compose --file docker-compose-kafka.yml down --remove-orphans --volumes 2>/dev/null || true; \
-	}; \
-	trap cleanup EXIT; \
-	echo "=== Starting Kafka in background ==="; \
-	docker compose --file docker-compose-kafka.yml up -d; \
-	echo "Waiting for Kafka broker (healthcheck)..."; \
-	for i in $$(seq 1 40); do \
-		if docker compose --file docker-compose-kafka.yml exec -T kafka \
-			kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; then \
-			echo "Kafka is ready."; break; \
-		fi; \
-		sleep 3; \
-	done; \
-	echo "=== Starting producer + consumer via Dapr ==="; \
-	dapr run -f . > $(DAPR_LOG) 2>&1 & \
-	echo "Waiting for producer on :5232..."; \
-	for i in $$(seq 1 60); do \
-		curl -sf http://localhost:5232/dapr/config >/dev/null 2>&1 && break; \
-		sleep 2; \
-	done; \
-	echo "Waiting for consumer on :5231..."; \
-	for i in $$(seq 1 60); do \
-		STATUS=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5231/ 2>/dev/null); \
-		[ "$$STATUS" != "000" ] && break; \
-		sleep 2; \
-	done; \
-	echo "=== Services ready — running legacy e2e sidecar tests ==="; \
-	DAPR_LOG=$(DAPR_LOG) bash e2e/e2e-sidecar.sh
 
 #ci-run: @ Run GitHub Actions workflow locally using act
 ci-run: deps-act
@@ -391,6 +352,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
-        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e e2e-sidecar \
-        e2e-kind kind-up kind-down image-build coverage-check dapr-init update run post stop stop-dapr \
-        stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e e2e-kind \
+        kind-up kind-down image-build coverage-check dapr-init update run post stop stop-dapr stop-apps \
+        kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
