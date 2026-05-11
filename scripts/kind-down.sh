@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Tear down the KinD cluster + cloud-provider-kind. Also prunes any
 # orphan kindccm-* envoy sidecars (cloud-provider-kind's per-Service
 # proxy containers that survive cluster deletion and would otherwise

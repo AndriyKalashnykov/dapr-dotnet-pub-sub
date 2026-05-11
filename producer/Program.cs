@@ -1,4 +1,6 @@
-﻿using System.Text;
+// SPDX-License-Identifier: MIT
+
+using System.Text;
 using System.Text.Json;
 using Dapr.Client;
 using Common;

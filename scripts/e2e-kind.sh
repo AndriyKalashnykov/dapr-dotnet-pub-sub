@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # K8s e2e: bring up KinD with Dapr + Kafka + producer/consumer, exercise
 # the publish path through the LoadBalancer IP, and assert subscription
 # routing via the consumer pod's stdout.

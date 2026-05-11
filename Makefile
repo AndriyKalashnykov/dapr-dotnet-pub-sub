@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 .DEFAULT_GOAL := help
 
 # Use bash for recipe execution (dash lacks `set -o pipefail`)
@@ -176,8 +178,24 @@ mermaid-lint: deps-docker
 		exit 1; \
 	fi
 
-#static-check: @ Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check)
-static-check: lint vulncheck trivy-fs secrets mermaid-lint deps-prune-check
+#license-check: @ Verify every source file carries an SPDX-License-Identifier header
+license-check:
+	@set -euo pipefail; \
+	MISSING=0; \
+	for f in $$(git ls-files '*.cs' '*.sh' Dockerfile '*/Dockerfile' Makefile 2>/dev/null); do \
+		if [ -f "$$f" ] && ! head -2 "$$f" | grep -qF 'SPDX-License-Identifier'; then \
+			echo "MISSING SPDX header: $$f"; \
+			MISSING=$$((MISSING + 1)); \
+		fi; \
+	done; \
+	if [ "$$MISSING" -gt 0 ]; then \
+		echo "License check failed: $$MISSING file(s) missing SPDX header."; \
+		exit 1; \
+	fi; \
+	echo "License check passed: all tracked source files carry an SPDX header."
+
+#static-check: @ Composite quality gate (lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check)
+static-check: lint license-check vulncheck trivy-fs secrets mermaid-lint deps-prune-check
 	@echo "All static checks passed."
 
 #build: @ Restore and build entire solution
@@ -286,6 +304,23 @@ dapr-init: deps-run
 image-build: deps-docker
 	@docker compose --file compose/docker-compose.yml build producer consumer
 
+#image-scan: @ Trivy scan the built producer + consumer images (HIGH,CRITICAL, fixed-only)
+image-scan: deps-docker image-build
+	@set -euo pipefail; \
+	for IMAGE in dapr-dotnet-pub-sub-producer:e2e dapr-dotnet-pub-sub-consumer:e2e; do \
+		echo "Scanning $$IMAGE..."; \
+		docker run --rm \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			ghcr.io/aquasecurity/trivy:$(TRIVY_VERSION) \
+			image \
+			--severity HIGH,CRITICAL \
+			--ignore-unfixed \
+			--exit-code 1 \
+			--no-progress \
+			"$$IMAGE"; \
+	done; \
+	echo "Image scan passed: no fixed HIGH/CRITICAL vulnerabilities in producer/consumer images."
+
 #e2e: @ Run Compose-based e2e (Kafka + producer/consumer + Dapr sidecars in containers)
 e2e: deps-docker image-build
 	@bash scripts/e2e-compose.sh
@@ -313,7 +348,7 @@ ci-run: deps-act
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
-	for j in changes static-check build test e2e e2e-kind ci-pass; do \
+	for j in changes static-check build test image-scan e2e e2e-kind ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
 			--container-architecture linux/amd64 \
@@ -352,6 +387,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
-        vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e e2e-kind \
-        kind-up kind-down image-build coverage-check dapr-init update run post stop stop-dapr stop-apps \
-        kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+        license-check vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test \
+        e2e e2e-kind kind-up kind-down image-build image-scan coverage-check dapr-init update run post stop \
+        stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

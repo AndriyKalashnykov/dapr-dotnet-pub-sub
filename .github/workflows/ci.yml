@@ -14,6 +14,9 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  # `docker` job needs id-token: write for cosign keyless OIDC signing AND
+  # packages: write to push images to ghcr.io. Scoped to the docker job in
+  # its own permissions block; everything else stays read-only.
 
 jobs:
   changes:
@@ -85,6 +88,19 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  image-scan:
+    needs: [changes, build, test]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: ./.github/actions/setup-dotnet-cached
+
+      - name: Image scan (Trivy, fixed-only HIGH/CRITICAL)
+        run: make image-scan
+
   e2e:
     needs: [changes, build, test]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
@@ -137,9 +153,74 @@ jobs:
         if: always()
         run: make kind-down
 
+  docker:
+    needs: [changes, static-check, build, test, image-scan, e2e, e2e-kind]
+    # Only build + push + sign on main pushes and on v* tags. Pull requests
+    # do not push (the e2e job has already validated the image build).
+    if: >-
+      ${{ !failure() && !cancelled()
+        && needs.changes.outputs.code == 'true'
+        && (github.event_name == 'push' || github.event_name == 'workflow_call')
+        && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write   # cosign keyless OIDC
+      packages: write   # push to ghcr.io
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [producer, consumer]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@318604b99d75b7a1c2f001c95dffd99a30d59ae0 # v5.10.0
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - uses: docker/build-push-action@2634353a5390a7eaa5dd03de08750dd1ce86a290 # v6.19.0
+        id: build
+        with:
+          context: .
+          file: ${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+      - uses: sigstore/cosign-installer@39afb6f9e23b8a93a72ee79b6cabd47e91510bf6 # v3.10.0
+
+      - name: Sign image (keyless OIDC)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            cosign sign --yes "${tag}@${DIGEST}"
+          done <<< "${TAGS}"
+
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, e2e, e2e-kind]
+    needs: [changes, static-check, build, test, image-scan, e2e, e2e-kind]
     timeout-minutes: 2
     runs-on: ubuntu-latest
     steps:

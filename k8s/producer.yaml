@@ -19,6 +19,7 @@ spec:
         dapr.io/app-id: "producer"
         dapr.io/app-port: "5232"
         dapr.io/app-protocol: "http"
+        dapr.io/config: "tracing"
         dapr.io/log-level: "warn"
     spec:
       securityContext:
