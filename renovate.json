@@ -14,13 +14,14 @@
   "prHourlyLimit": 0,
   "platformAutomerge": true,
   "automerge": true,
-  "automergeType": "branch",
+  "automergeType": "pr",
   "automergeStrategy": "squash",
   "ignoreTests": false,
   "enabledManagers": [
     "github-actions",
     "nuget",
     "docker-compose",
+    "mise",
     "custom.regex"
   ],
   "vulnerabilityAlerts": {
@@ -72,6 +73,13 @@
         "custom.regex"
       ],
       "groupName": "Makefile tool versions"
+    },
+    {
+      "description": "Group mise-managed tools (node, dapr CLI, act) into one PR",
+      "matchManagers": [
+        "mise"
+      ],
+      "groupName": "mise tools"
     }
   ],
   "customManagers": [
@@ -80,7 +88,7 @@
       "description": "Update Makefile tool versions via inline renovate comments",
       "managerFilePatterns": ["/^Makefile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)( versioning=(?<versioning>[^\\s]+))?( extractVersion=(?<extractVersionTemplate>[^\\s]+))?\\n[A-Z_]+\\s*:=\\s*(?<currentValue>[^\\s]+)"
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)(?: registryUrl=(?<registryUrl>[^\\s]+))?(?: versioning=(?<versioning>[^\\s]+))?(?: extractVersion=(?<extractVersion>[^\\s]+))?\\n[A-Z_]+\\s*[?:]?=\\s*(?<currentValue>[^\\s]+)"
       ]
     }
   ]

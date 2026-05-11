@@ -1,0 +1,4 @@
+[tools]
+node = "24"
+"aqua:dapr/cli" = "1.17.1"
+"aqua:nektos/act" = "0.2.87"

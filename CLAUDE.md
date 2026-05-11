@@ -13,7 +13,8 @@ make help                     # List available tasks
 make deps                     # Check required tool dependencies (dotnet, curl)
 make deps-docker              # Check Docker is installed (for containerised scanners)
 make deps-run                 # Check runtime dependencies (dotnet, curl, docker, dapr)
-make deps-act                 # Install act for local CI (to ~/.local/bin)
+make deps-tools               # Install pinned tools (mise + Node, Dapr CLI, act per .mise.toml)
+make deps-act                 # Alias for deps-tools (preserved for ci-run dependency chain)
 make clean                    # Remove build artifacts
 make format                   # Auto-fix code formatting
 make lint                     # Check code style and compiler warnings
@@ -41,7 +42,7 @@ make kafka-stop               # Stop Kafka stack and remove volumes
 make ci                       # Run full CI pipeline (static-check, build, test, e2e, coverage-check)
 make ci-run                   # Run GitHub Actions workflow locally using act
 make release VERSION=vX.Y.Z   # Create a semver-validated release tag
-make renovate-bootstrap       # Install nvm and Node for Renovate
+make renovate-bootstrap       # Install Node (via mise) for Renovate
 make renovate-validate        # Validate Renovate configuration
 ```
 
@@ -91,16 +92,22 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Dapr SDK: `Dapr.AspNetCore` 1.17.8
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `static-check` → `build`/`test` (parallel) → `e2e`/`coverage` (parallel) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e` → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (full suite + 80% line threshold + cobertura artifact upload); there is no separate `coverage` job.
 - Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
+- Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.
+
+### CI / act gap
+
+`make ci-run` exercises the GitHub Actions workflow via [act](https://github.com/nektos/act). Two notes:
+
+- The `Upload coverage report` step inside the `test` job is gated `if: always() && env.ACT != 'true'` because act's artifact server rejects the v7 uploader's `mime_type` field. The step runs normally on GitHub-hosted runners.
+- A green `make ci-run` therefore does NOT exercise artifact upload — confirm on a real GitHub run before relying on the cobertura report being published.
 
 ## Upgrade Backlog
 
-- [ ] TUnit daily releases generate frequent Renovate PRs — grouped under `TUnit` package rule; review if PR volume becomes disruptive
-- [x] **Add real-sidecar e2e test** — `make e2e-sidecar` starts Kafka + Dapr, publishes messages, and verifies subscription routing via consumer log assertions. Requires Docker + Dapr CLI.
 - [ ] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — Create Dockerfiles for producer and consumer, build images, and run them in Docker Compose alongside Kafka (and Dapr sidecars as containers). The `e2e-sidecar` target currently backgrounds `dapr run -f .` and greps its log file, which is fragile (process lifecycle, log race). A Compose-based approach (`docker compose up -d --wait`, curl, `docker compose down`) is deterministic, isolated, and CI-friendly. Targets: `image-build`, `e2e-compose`. Use `/harden-image-pipeline` skill for Dockerfile conventions.
-- [ ] **K8s e2e: deploy to KinD + MetalLB and run tests** — After Dockerfiles exist (previous item), create K8s manifests (`k8s/`) for producer, consumer, and Dapr components. Deploy onto a KinD cluster with MetalLB (for `ServiceType: LoadBalancer`) and Dapr installed via Helm. Run the e2e test script against the LoadBalancer IP. This validates manifest wiring, sidecar injection, service discovery, and subscription routing in a real cluster. Targets: `kind-up`, `kind-down`, `e2e` (promoted to KinD-based). Use `/makefile` skill Kubernetes Targets section for conventions.
+- [ ] **K8s e2e: deploy to KinD + cloud-provider-kind and run tests** — After Dockerfiles exist (previous item), create K8s manifests (`k8s/`) for producer, consumer, and Dapr components. Deploy onto a KinD cluster with cloud-provider-kind (for `ServiceType: LoadBalancer`) and Dapr installed via Helm. Run the e2e test script against the LoadBalancer IP. This validates manifest wiring, sidecar injection, service discovery, and subscription routing in a real cluster. Targets: `kind-up`, `kind-down`, `e2e` (promoted to KinD-based). Use `/makefile` skill Kubernetes Targets section for conventions.
 
 ## Skills
 

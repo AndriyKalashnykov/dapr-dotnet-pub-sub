@@ -3,24 +3,17 @@
 # Use bash for recipe execution (dash lacks `set -o pipefail`)
 SHELL := /bin/bash
 
-# Ensure user-local binaries are on PATH (for tools installed by deps-act)
-export PATH := $(HOME)/.local/bin:$(PATH)
+# Ensure user-local binaries (mise + mise shims) are on PATH
+export PATH := $(HOME)/.local/share/mise/shims:$(HOME)/.local/bin:$(PATH)
 
 # ---------------------------------------------------------------------------
 # Tool versions
 # ---------------------------------------------------------------------------
 # .NET SDK version derived from global.json (single source of truth)
 DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1]"."v[2]; exit}' global.json 2>/dev/null)
-# Node version derived from .nvmrc (single source of truth)
-NODE_VERSION       := $(shell cat .nvmrc 2>/dev/null || echo 24)
-# renovate: datasource=github-releases depName=dapr/cli extractVersion=^v(?<version>.*)$
-DAPR_CLI_VERSION     := 1.17.1
+# Node, dapr CLI, and act are pinned in .mise.toml — Renovate's mise manager tracks them
 # renovate: datasource=github-releases depName=dapr/dapr extractVersion=^v(?<version>.*)$
 DAPR_RUNTIME_VERSION := 1.17.4
-# renovate: datasource=github-releases depName=nvm-sh/nvm extractVersion=^v(?<version>.*)$
-NVM_VERSION        := 0.40.4
-# renovate: datasource=github-releases depName=nektos/act extractVersion=^v(?<version>.*)$
-ACT_VERSION        := 0.2.87
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
 TRIVY_VERSION      := 0.69.3
 # renovate: datasource=github-releases depName=gitleaks/gitleaks extractVersion=^v(?<version>.*)$
@@ -60,18 +53,20 @@ deps-docker:
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed"; exit 1; }
 
 #deps-run: @ Check runtime dependencies (dotnet, curl, docker, dapr)
-deps-run: deps deps-docker
-	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (need $(DAPR_CLI_VERSION)+)"; exit 1; }
+deps-run: deps deps-docker deps-tools
+	@command -v dapr   >/dev/null 2>&1 || { echo "ERROR: dapr CLI is not installed (run 'mise install')"; exit 1; }
 
-#deps-act: @ Install act for local CI (to ~/.local/bin)
-deps-act: deps
+#deps-tools: @ Install pinned tools (mise + node, dapr CLI, act per .mise.toml)
+deps-tools:
 	@set -euo pipefail; \
-	if ! command -v act >/dev/null 2>&1; then \
-		echo "Installing act $(ACT_VERSION) to $$HOME/.local/bin..."; \
-		mkdir -p "$$HOME/.local/bin"; \
-		curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh \
-			| bash -s -- -b "$$HOME/.local/bin" v$(ACT_VERSION); \
-	fi
+	if ! command -v mise >/dev/null 2>&1; then \
+		echo "Installing mise (no root required, installs to ~/.local/bin)..."; \
+		curl -fsSL https://mise.run | sh; \
+	fi; \
+	mise install --yes
+
+#deps-act: @ Install pinned tools (alias for deps-tools — needed by ci-run)
+deps-act: deps-tools
 
 #deps-prune: @ Show redundant NuGet package references
 deps-prune: deps
@@ -140,6 +135,13 @@ secrets: deps-docker
 #mermaid-lint: @ Validate Mermaid diagrams in markdown files
 mermaid-lint: deps-docker
 	@set -euo pipefail; \
+	IMAGE="minlag/mermaid-cli:$(MERMAID_CLI_VERSION)"; \
+	for attempt in 1 2 3; do \
+		if docker pull --quiet "$$IMAGE" >/dev/null 2>&1; then break; fi; \
+		if [ "$$attempt" -eq 3 ]; then echo "ERROR: failed to pull $$IMAGE after 3 attempts"; exit 1; fi; \
+		echo "Pull attempt $$attempt failed; retrying in $$((attempt * 5))s..."; \
+		sleep $$((attempt * 5)); \
+	done; \
 	MD_FILES=$$(git ls-files '*.md' 2>/dev/null | xargs grep -lF '```mermaid' 2>/dev/null || true); \
 	if [ -z "$$MD_FILES" ]; then \
 		echo "No Mermaid blocks found — skipping."; \
@@ -149,8 +151,8 @@ mermaid-lint: deps-docker
 	for md in $$MD_FILES; do \
 		echo "Validating Mermaid blocks in $$md..."; \
 		LOG=$$(mktemp); \
-		if docker run --rm -v "$$PWD:/data" \
-			minlag/mermaid-cli:$(MERMAID_CLI_VERSION) \
+		if docker run --rm -v "$$PWD:/data:ro" \
+			"$$IMAGE" \
 			-i "/data/$$md" -o "/tmp/$$(basename $$md .md).svg" >"$$LOG" 2>&1; then \
 			echo "  ✓ All blocks rendered cleanly."; \
 		else \
@@ -248,7 +250,7 @@ stop: stop-dapr stop-apps
 	@echo "All stopped."
 
 #kafka-start: @ Start Kafka stack (KRaft mode, foreground)
-kafka-start: deps-run
+kafka-start: deps deps-docker
 	@docker compose --file docker-compose-kafka.yml up
 
 #kafka-stop: @ Stop Kafka stack and remove volumes
@@ -313,9 +315,19 @@ e2e-sidecar: deps-run build dapr-init
 
 #ci-run: @ Run GitHub Actions workflow locally using act
 ci-run: deps-act
-	@docker container prune -f 2>/dev/null || true
-	@act push --container-architecture linux/amd64 \
-		--artifact-server-path /tmp/act-artifacts
+	@set -euo pipefail; \
+	docker container prune -f 2>/dev/null || true; \
+	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
+	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
+	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
+	for j in changes static-check build test e2e ci-pass; do \
+		echo "==== act push --job $$j ===="; \
+		act push --job "$$j" \
+			--container-architecture linux/amd64 \
+			--pull=false \
+			--artifact-server-port "$$ACT_PORT" \
+			--artifact-server-path "$$ARTIFACT_PATH" || exit 1; \
+	done
 
 #release: @ Create a release tag (usage: make release VERSION=v1.2.3 or interactive)
 release:
@@ -334,16 +346,8 @@ release:
 	read -r -p "Push $$NEW_TAG to origin? [y/N] " ANS; \
 	case "$${ANS:-N}" in [yY]) git push origin "$$NEW_TAG" && echo "Pushed $$NEW_TAG." ;; *) echo "Tag created locally. Push with: git push origin $$NEW_TAG" ;; esac
 
-#renovate-bootstrap: @ Install nvm and Node for Renovate
-renovate-bootstrap:
-	@set -euo pipefail; \
-	if ! command -v node >/dev/null 2>&1; then \
-		echo "Installing nvm $(NVM_VERSION)..."; \
-		curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$(NVM_VERSION)/install.sh | bash; \
-		export NVM_DIR="$$HOME/.nvm"; \
-		[ -s "$$NVM_DIR/nvm.sh" ] && . "$$NVM_DIR/nvm.sh"; \
-		nvm install $(NODE_VERSION); \
-	fi
+#renovate-bootstrap: @ Install Node (via mise) for Renovate
+renovate-bootstrap: deps-tools
 
 #renovate-validate: @ Validate Renovate configuration
 renovate-validate: renovate-bootstrap
@@ -354,7 +358,7 @@ renovate-validate: renovate-bootstrap
 		npx --yes renovate --platform=local; \
 	fi
 
-.PHONY: help deps deps-docker deps-run deps-act deps-prune deps-prune-check clean format lint \
+.PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
         vulncheck trivy-fs secrets mermaid-lint static-check build test e2e coverage-check \
         dapr-init update run post stop stop-dapr stop-apps kafka-start kafka-stop ci e2e-sidecar ci-run \
         release renovate-bootstrap renovate-validate

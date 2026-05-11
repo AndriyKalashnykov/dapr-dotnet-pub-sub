@@ -3,9 +3,29 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://app.renovatebot.com/dashboard#github/AndriyKalashnykov/dapr-dotnet-pub-sub)
 
-# Dapr pub/sub demo with .NET 10 microservices, Kafka, and content-based subscription routing
+# Dapr Pub/Sub on .NET 10 — Reference Service
 
-Dapr publish-subscribe demo with two .NET 10 microservices communicating via Kafka through the Dapr sidecar. The **producer** publishes `TinyMessage` events to a Kafka topic; the **consumer** receives them via Dapr's declarative subscription with content-based routing.
+The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka. The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a real-sidecar e2e harness (`make e2e-sidecar`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy fs scan, gitleaks, Mermaid lint, dependency pruning) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
+
+```mermaid
+C4Container
+    Person(client, "Client", "Sends pub/sub messages")
+
+    System_Boundary(app, "Dapr Pub/Sub Demo") {
+        Container(producer, "producer", ".NET 10 / ASP.NET Core", "POST /send, /sendasbytes")
+        Container(producerDapr, "Dapr sidecar", "Dapr 1.17", ":3532")
+        Container(consumer, "consumer", ".NET 10 / ASP.NET Core", "/handletype1, /handletype2, /dafault-messagehandler")
+        Container(consumerDapr, "Dapr sidecar", "Dapr 1.17", ":3531")
+    }
+
+    ContainerDb(kafka, "Kafka topic", "Apache Kafka (KRaft)", "incoming-messages")
+
+    Rel(client, producer, "POST /send", "HTTP/JSON")
+    Rel(producer, producerDapr, "Publish")
+    Rel(producerDapr, kafka, "Produce")
+    Rel(kafka, consumerDapr, "Consume")
+    Rel(consumerDapr, consumer, "Route by type", "type==1 / type==2 / default")
+```
 
 Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applications/building-blocks/pubsub/) for more information.
 
@@ -20,33 +40,10 @@ Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applicati
 | Testing | [TUnit](https://tunit.dev/) 1.31.0 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
 | Mocking | [FakeItEasy](https://fakeiteasy.github.io/) 9.0.1 |
 | Infrastructure | Docker Compose (Kafka + Kafka UI) |
+| Tool management | [mise](https://mise.jdx.dev/) (Node, Dapr CLI, act per `.mise.toml`) |
 | CI/CD | GitHub Actions |
 | Dependencies | [Renovate](https://docs.renovatebot.com/) with platform automerge |
 | Static Analysis | `dotnet format`, Trivy (fs, vuln, secret, misconfig), gitleaks, mermaid-cli (diagram lint) |
-
-## Architecture
-
-```mermaid
-graph LR
-    client[Client]
-    producer[producer<br/>:5232]
-    producerDapr[Dapr sidecar<br/>:3532]
-    kafka[(Kafka topic<br/>incoming-messages)]
-    consumerDapr[Dapr sidecar<br/>:3531]
-    consumer[consumer<br/>:5231]
-    h1[POST /handletype1]
-    h2[POST /handletype2]
-    hd[POST /dafault-messagehandler]
-
-    client -->|POST /send| producer
-    producer --> producerDapr
-    producerDapr -->|publish| kafka
-    kafka -->|subscribe| consumerDapr
-    consumerDapr --> consumer
-    consumer -->|"type == '1'"| h1
-    consumer -->|"type == '2'"| h2
-    consumer -->|default| hd
-```
 
 ## Quick Start
 
@@ -75,8 +72,7 @@ To run the full test suite: `make test` (unit), `make e2e` (endpoint), `make cov
 | [Git](https://git-scm.com/) | 2.0+ | Version control |
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Build and run .NET projects (pinned via `global.json`) |
 | [Docker](https://www.docker.com/) | 20.10+ | Run Kafka, Trivy, and gitleaks |
-| [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) | 1.17.1+ | Sidecar-based pub/sub (run `make dapr-init` once to install the pinned runtime) |
-| [act](https://github.com/nektos/act) | 0.2.87+ | Run GitHub Actions locally (used by `make ci-run`) |
+| [mise](https://mise.jdx.dev/) | any | Installs the Dapr CLI, act, and Node pinned in `.mise.toml` (`make deps-tools`) |
 | [curl](https://curl.se/) | any | Send HTTP requests to APIs |
 
 Verify the .NET SDK is installed:
@@ -85,72 +81,9 @@ Verify the .NET SDK is installed:
 make deps
 ```
 
-For full runtime verification (docker, dapr), use `make deps-run`.
+For full runtime verification (docker, mise-managed dapr CLI), use `make deps-run`. Run `make dapr-init` once to install the pinned Dapr runtime.
 
-## Available Make Targets
-
-Run `make help` to see all available targets.
-
-### Build & Run
-
-| Target | Description |
-|--------|-------------|
-| `make build` | Restore and build entire solution |
-| `make test` | Run unit tests (TinyMessageDto only) |
-| `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
-| `make coverage-check` | Run full test suite with code coverage and enforce 80% threshold |
-| `make e2e-sidecar` | Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline) |
-| `make clean` | Remove build artifacts |
-| `make run` | Build, stop previous, and run both apps via Dapr |
-| `make post` | Send test messages to producer (requires `make run`) |
-| `make update` | Update NuGet packages to latest versions |
-
-### Code Quality
-
-| Target | Description |
-|--------|-------------|
-| `make format` | Auto-fix code formatting |
-| `make lint` | Check code style and compiler warnings (format verify + warnings-as-errors) |
-| `make vulncheck` | Check for vulnerable NuGet packages |
-| `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
-| `make secrets` | Scan for committed secrets with gitleaks |
-| `make mermaid-lint` | Validate Mermaid diagrams in markdown files |
-| `make deps-prune` | Show redundant NuGet package references |
-| `make deps-prune-check` | Verify no redundant NuGet package references |
-| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
-
-### Dapr & Kafka
-
-| Target | Description |
-|--------|-------------|
-| `make dapr-init` | Initialize Dapr with pinned runtime version (idempotent) |
-| `make kafka-start` | Start Kafka stack (KRaft mode, foreground) |
-| `make kafka-stop` | Stop Kafka stack and remove volumes |
-| `make stop` | Stop Dapr and kill processes on known ports |
-| `make stop-dapr` | Stop Dapr multi-app run |
-| `make stop-apps` | Kill processes on known ports (usage: `make stop-apps PORTS="5231 5232 ..."`) |
-
-### CI
-
-| Target | Description |
-|--------|-------------|
-| `make ci` | Run full CI pipeline (static-check, build, test, e2e, coverage-check) |
-| `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
-
-### Utilities
-
-| Target | Description |
-|--------|-------------|
-| `make help` | List available tasks |
-| `make deps` | Check required tool dependencies (dotnet, curl) |
-| `make deps-docker` | Check Docker is installed (for containerised scanners) |
-| `make deps-run` | Check runtime dependencies (dotnet, curl, docker, dapr) |
-| `make deps-act` | Install act for local CI (to `~/.local/bin`) |
-| `make release VERSION=vX.Y.Z` | Create a semver-validated release tag |
-| `make renovate-bootstrap` | Install nvm and Node for Renovate |
-| `make renovate-validate` | Validate Renovate configuration |
-
-## Architecture Details
+## Architecture
 
 ### Projects
 
@@ -197,31 +130,6 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 |----------|------|---------|
 | Kafka    | 9092 | Message broker |
 | Kafka UI | 9080 | Web UI at <http://localhost:9080> |
-
-## CI/CD
-
-GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check.
-
-| Job | Triggers | Steps |
-|-----|----------|-------|
-| **static-check** | push, PR, tags | `make static-check` (composite quality gate) |
-| **build** | after static-check | `make build` |
-| **test** | after static-check | `make test` (unit tests) |
-| **e2e** | after build + test | `make e2e` (WebApplicationFactory endpoint tests) |
-| **coverage** | after build + test | `make coverage-check` (80% line threshold) + upload cobertura report |
-| **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed or was cancelled (single branch-protection check) |
-
-`build` and `test` run in parallel after `static-check` passes; `e2e` and `coverage` run in parallel after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
-
-A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
-
-### Required Secrets and Variables
-
-No user-defined secrets or variables are required — workflows use only the built-in `GITHUB_TOKEN` provided automatically to every GitHub Actions run.
-
-### Dependency Updates
-
-[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK, and Docker Compose image updates into single PRs, and uses a custom regex manager to update Makefile tool version constants (`TRIVY_VERSION`, `GITLEAKS_VERSION`, `ACT_VERSION`, `NVM_VERSION`, `DAPR_CLI_VERSION`) via inline `# renovate:` comments.
 
 ## Run all apps with multi-app run template file
 
@@ -288,3 +196,96 @@ Stop and clean up:
 dapr stop --app-id consumer
 dapr stop --app-id producer
 ```
+
+## Available Make Targets
+
+Run `make help` to see all available targets.
+
+### Build & Run
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Restore and build entire solution |
+| `make test` | Run unit tests (TinyMessageDto only) |
+| `make e2e` | Run end-to-end tests (Producer/Consumer via WebApplicationFactory) |
+| `make coverage-check` | Run full test suite with code coverage and enforce 80% threshold |
+| `make e2e-sidecar` | Run real-sidecar e2e tests (starts Kafka + Dapr, tests full pub/sub pipeline) |
+| `make clean` | Remove build artifacts |
+| `make run` | Build, stop previous, and run both apps via Dapr |
+| `make post` | Send test messages to producer (requires `make run`) |
+| `make update` | Update NuGet packages to latest versions |
+
+### Code Quality
+
+| Target | Description |
+|--------|-------------|
+| `make format` | Auto-fix code formatting |
+| `make lint` | Check code style and compiler warnings (format verify + warnings-as-errors) |
+| `make vulncheck` | Check for vulnerable NuGet packages |
+| `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
+| `make secrets` | Scan for committed secrets with gitleaks |
+| `make mermaid-lint` | Validate Mermaid diagrams in markdown files |
+| `make deps-prune` | Show redundant NuGet package references |
+| `make deps-prune-check` | Verify no redundant NuGet package references |
+| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
+
+### Dapr & Kafka
+
+| Target | Description |
+|--------|-------------|
+| `make dapr-init` | Initialize Dapr with pinned runtime version (idempotent) |
+| `make kafka-start` | Start Kafka stack (KRaft mode, foreground) |
+| `make kafka-stop` | Stop Kafka stack and remove volumes |
+| `make stop` | Stop Dapr and kill processes on known ports |
+| `make stop-dapr` | Stop Dapr multi-app run |
+| `make stop-apps PORTS="..."` | Kill processes on given ports (usage: `make stop-apps PORTS="5231 5232 ..."`) |
+
+### CI
+
+| Target | Description |
+|--------|-------------|
+| `make ci` | Run full CI pipeline (static-check, build, test, e2e, coverage-check) |
+| `make ci-run` | Run GitHub Actions workflow locally via [act](https://github.com/nektos/act) (requires Docker) |
+
+### Utilities
+
+| Target | Description |
+|--------|-------------|
+| `make help` | List available tasks |
+| `make deps` | Check required tool dependencies (dotnet, curl) |
+| `make deps-docker` | Check Docker is installed (for containerised scanners) |
+| `make deps-run` | Check runtime dependencies (dotnet, curl, docker, mise-managed dapr CLI) |
+| `make deps-tools` | Install pinned tools (mise + node, dapr CLI, act per `.mise.toml`) |
+| `make deps-act` | Install pinned tools (alias for `deps-tools` — needed by `ci-run`) |
+| `make release VERSION=vX.Y.Z` | Create a semver-validated release tag |
+| `make renovate-bootstrap` | Install Node (via mise) for Renovate |
+| `make renovate-validate` | Validate Renovate configuration |
+
+## CI/CD
+
+GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check. A `changes` job (using `dorny/paths-filter`) gates heavy work so doc-only changes short-circuit cleanly while still satisfying the required `ci-pass` status check.
+
+| Job | Triggers | Steps |
+|-----|----------|-------|
+| **changes** | push, PR, tags | `dorny/paths-filter` — outputs `code=true` when non-doc files change |
+| **static-check** | after `changes` (when `code==true`) | `make static-check` (composite quality gate) |
+| **build** | after `static-check` | `make build` |
+| **test** | after `static-check` | `make coverage-check` (runs the full suite + enforces 80% line threshold; uploads cobertura artifact) |
+| **e2e** | after `build` + `test` | `make e2e` (WebApplicationFactory endpoint tests) |
+| **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed OR was cancelled (single branch-protection check) |
+
+`build` and `test` run in parallel after `static-check` passes; `e2e` runs after both. `ci-pass` gates on the full set so branch protection only needs to track a single check.
+
+A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
+
+### Required Secrets and Variables
+
+No user-defined secrets or variables are required — workflows use only the built-in `GITHUB_TOKEN` provided automatically to every GitHub Actions run.
+
+### Dependency Updates
+
+[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `mise` manager tracks Node, Dapr CLI, and act from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) via inline `# renovate:` comments.
+
+## Contributing
+
+Contributions welcome — open a PR.
