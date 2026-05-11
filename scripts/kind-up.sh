@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Bootstrap a KinD cluster for the K8s e2e: creates the cluster, starts
 # cloud-provider-kind (so Services of type LoadBalancer get external IPs),
 # installs Dapr via Helm and Kafka via the Bitnami chart, loads the
@@ -48,11 +49,16 @@ echo "=== Installing Dapr (Helm ${DAPR_HELM_VERSION}) ==="
 echo "=== Creating namespace ${NS} ==="
 "${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/namespace.yaml"
 
+echo "=== Deploying Jaeger (all-in-one) ==="
+"${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/jaeger.yaml"
+"${KUBECTL[@]}" -n "$NS" rollout status deployment/jaeger --timeout=120s
+
 echo "=== Deploying Kafka (KRaft StatefulSet) ==="
 "${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/kafka.yaml"
 "${KUBECTL[@]}" -n "$NS" rollout status statefulset/kafka --timeout=240s
 
-echo "=== Applying producer + consumer manifests ==="
+echo "=== Applying Dapr Configuration + Component + Subscription + apps ==="
+"${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/config.yaml"
 "${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/pubsub.yaml"
 "${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/subscription.yaml"
 "${KUBECTL[@]}" apply -f "$(dirname "$0")/../k8s/producer.yaml"

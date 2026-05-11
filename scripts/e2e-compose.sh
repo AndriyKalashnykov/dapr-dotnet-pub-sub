@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Compose-based e2e: brings producer + consumer + Dapr sidecars + Kafka up
 # via `docker compose --wait`, exercises pub/sub through real Dapr sidecars,
 # and asserts subscription routing via the consumer container's stdout.

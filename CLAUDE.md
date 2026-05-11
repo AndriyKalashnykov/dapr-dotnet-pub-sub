@@ -21,16 +21,18 @@ make lint                     # Check code style and compiler warnings
 make vulncheck                # Check for vulnerable NuGet packages
 make trivy-fs                 # Trivy filesystem scan (vuln, secret, misconfig)
 make secrets                  # Scan for committed secrets with gitleaks
+make license-check            # Verify every source file carries an SPDX-License-Identifier header
 make mermaid-lint             # Validate Mermaid diagrams in markdown files
 make deps-prune               # Show redundant NuGet package references
 make deps-prune-check         # Verify no redundant NuGet package references
-make static-check             # Composite gate: lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
+make static-check             # Composite gate: lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
 make build                    # Restore + build entire solution
 make test                     # Run unit tests (Category=Unit, seconds)
 make integration-test         # Run integration tests (Category=Integration, in-process WebApplicationFactory)
 make coverage-check           # Run full suite with coverage and enforce 80% line threshold
 make image-build              # Build producer + consumer Docker images (used by e2e)
-make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + producer/consumer as containers)
+make image-scan               # Trivy image scan (HIGH/CRITICAL fixed-only) against built producer/consumer images
+make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + Jaeger + producer/consumer as containers)
 make kind-up                  # Create KinD cluster with Dapr + Kafka + apps + cloud-provider-kind
 make kind-down                # Tear down KinD cluster + cloud-provider-kind orphans
 make e2e-kind                 # Run K8s e2e against KinD LoadBalancer IP (requires kind-up)
@@ -77,13 +79,13 @@ Defined in `components/subscription.yaml` using Dapr v2alpha1 Subscription spec:
 
 ### Dapr components — one set per deployment flow
 
-| Flow | Path | Broker address |
-|------|------|----------------|
-| Local Dapr CLI (`make run`) | `components/kafka.yaml` + `components/subscription.yaml` | `localhost:9092` |
-| Compose-based e2e (`make e2e`) | `compose/components/pubsub.yaml` + `compose/components/subscription.yaml` | `kafka:29092` |
-| KinD-based K8s e2e (`make kind-up`) | `k8s/pubsub.yaml` + `k8s/subscription.yaml` (Component + Subscription CRDs) | `kafka.dapr-pubsub.svc.cluster.local:9092` |
+| Flow | Path | Broker address | Tracing |
+|------|------|----------------|---------|
+| Local Dapr CLI (`make run`) | `components/kafka.yaml` + `components/subscription.yaml` | `localhost:9092` | `components/dapr.yaml` (Configuration CRD with zipkin endpoint at `localhost:9411`) |
+| Compose-based e2e (`make e2e`) | `compose/components/pubsub.yaml` + `compose/components/subscription.yaml` | `kafka:29092` | `compose/components/config.yaml` → `jaeger:4317` (OTLP gRPC); daprd loaded via `--config` flag |
+| KinD-based K8s e2e (`make kind-up`) | `k8s/pubsub.yaml` + `k8s/subscription.yaml` | `kafka.dapr-pubsub.svc.cluster.local:9092` | `k8s/config.yaml` Configuration CRD + `k8s/jaeger.yaml` Deployment/Service; pods opt in via `dapr.io/config: tracing` annotation |
 
-All three share identical Subscription routing rules; only the broker address and component-loading mechanism differ. `components/dapr.yaml` is the Dapr configuration (tracing, metrics) used by the local CLI flow only.
+All three share identical Subscription routing rules; only the broker address, tracing exporter, and component-loading mechanism differ.
 
 ### Multi-app run template
 
@@ -106,7 +108,7 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 - Dapr SDK: `Dapr.AspNetCore` 1.17.8
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e`/`e2e-kind` (parallel) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars). The `e2e-kind` job brings up a KinD cluster with cloud-provider-kind + Helm-installed Dapr + Kafka manifest and asserts subscription delivery through the producer's LoadBalancer IP.
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `image-scan`/`e2e`/`e2e-kind` (parallel) → `docker` (main-only or v* tag, build + push to ghcr.io + cosign keyless OIDC sign) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `image-scan` job runs Trivy against the built producer/consumer images (HIGH/CRITICAL, fixed-only). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars + Jaeger). The `e2e-kind` job brings up a KinD cluster with cloud-provider-kind + Helm-installed Dapr + Kafka manifest + Jaeger and asserts subscription delivery through the producer's LoadBalancer IP. The `docker` job runs as a matrix over `[producer, consumer]`, builds with `provenance: mode=max` + `sbom: true`, pushes to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/<svc>`, and signs every digest with `sigstore/cosign-installer` keyless OIDC. License is MIT; every source file carries `SPDX-License-Identifier: MIT` (enforced by `make license-check`).
 - Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
 - Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.

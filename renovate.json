@@ -109,6 +109,14 @@
         "mcr.microsoft.com/dotnet/aspnet"
       ],
       "groupName": ".NET base images"
+    },
+    {
+      "description": "Group Jaeger images",
+      "matchPackageNames": [
+        "jaegertracing/jaeger",
+        "jaegertracing/all-in-one"
+      ],
+      "groupName": "Jaeger"
     }
   ],
   "customManagers": [

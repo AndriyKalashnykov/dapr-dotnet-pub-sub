@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 namespace Common;
 
 public record TinyMessage(Guid Id, DateTimeOffset TimeStamp, string Type = "");

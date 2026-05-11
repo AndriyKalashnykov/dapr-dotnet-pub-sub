@@ -5,7 +5,7 @@
 
 # Dapr Pub/Sub on .NET 10 — Reference Service
 
-The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka. The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a Compose-based real-sidecar e2e (`make e2e`), a KinD-based K8s e2e (`make kind-up && make e2e-kind`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy fs scan, gitleaks, Mermaid lint, dependency pruning) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
+The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka, with OpenTelemetry traces exported to a Jaeger v2 backend (OTLP gRPC). The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a Compose-based real-sidecar e2e (`make e2e`), a KinD-based K8s e2e (`make kind-up && make e2e-kind`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy filesystem + image scan, gitleaks, Mermaid lint, SPDX license-check, cosign keyless OIDC image signing) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
 
 ```mermaid
 C4Container
@@ -39,11 +39,12 @@ Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applicati
 | Message Broker | Apache Kafka (KRaft mode, Confluent images) |
 | Testing | [TUnit](https://tunit.dev/) 1.31.0 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
 | Mocking | [FakeItEasy](https://fakeiteasy.github.io/) 9.0.1 |
-| Infrastructure | Docker Compose (Kafka + Kafka UI) |
-| Tool management | [mise](https://mise.jdx.dev/) (Node, Dapr CLI, act per `.mise.toml`) |
-| CI/CD | GitHub Actions |
+| Infrastructure | Docker Compose (Kafka + Kafka UI + Jaeger v2) |
+| Observability | OpenTelemetry → [Jaeger v2](https://www.jaegertracing.io/) (OTLP gRPC, all-in-one) |
+| Tool management | [mise](https://mise.jdx.dev/) (Node, Dapr CLI, act, kind, kubectl, helm, cloud-provider-kind, cosign per `.mise.toml`) |
+| CI/CD | GitHub Actions with cosign keyless OIDC image signing |
 | Dependencies | [Renovate](https://docs.renovatebot.com/) with platform automerge |
-| Static Analysis | `dotnet format`, Trivy (fs, vuln, secret, misconfig), gitleaks, mermaid-cli (diagram lint) |
+| Static Analysis | `dotnet format`, Trivy (fs + image, vuln/secret/misconfig), gitleaks, mermaid-cli, SPDX license-check |
 
 ## Quick Start
 
@@ -127,6 +128,17 @@ All three share the same Subscription routing rules; only the broker address and
 | producer | 5232     | 3532              |
 | consumer | 5231     | 3531              |
 
+### Observability — OpenTelemetry tracing
+
+Producer + consumer + Dapr sidecars emit OpenTelemetry traces. Both e2e flows ship a [Jaeger v2](https://www.jaegertracing.io/) all-in-one backend on the Dapr OTLP gRPC endpoint:
+
+| Flow | Backend address (Dapr sidecar → Jaeger) | Jaeger UI |
+|------|----------------------------------------|-----------|
+| Compose (`make e2e`) | `jaeger:4317` | <http://localhost:16686> |
+| KinD (`make kind-up`) | `jaeger.dapr-pubsub.svc.cluster.local:4317` | `kubectl --context=kind-dapr-pubsub -n dapr-pubsub port-forward svc/jaeger 16686:16686` → <http://localhost:16686> |
+
+The Dapr [Configuration CRD](https://docs.dapr.io/operations/configuration/configuration-overview/) (`compose/components/config.yaml` for Compose, `k8s/config.yaml` for K8s) selects the OTLP exporter with 100% sampling for the e2e use case. Producer/consumer pods opt in via the `dapr.io/config: tracing` annotation (K8s) or daprd's `--config /components/config.yaml` flag (Compose).
+
 ### Infrastructure
 
 `compose/kafka-only.yml` runs Kafka in KRaft mode (no Zookeeper) plus Kafka UI for local Dapr-CLI flows (`make run`):
@@ -204,6 +216,18 @@ dapr stop --app-id consumer
 dapr stop --app-id producer
 ```
 
+## Build & Package
+
+The build pipeline produces three artefact tiers, each gated by its own `make` target:
+
+| Stage | Command | Output | Notes |
+|-------|---------|--------|-------|
+| Compile + publish | `make build` | `bin/Release/net10.0/*.dll` per project | Standard `dotnet build` |
+| OCI image | `make image-build` | `dapr-dotnet-pub-sub-{producer,consumer}:e2e` (local Docker daemon) | Multi-stage Dockerfile per service; non-root user 1000 |
+| Image scan | `make image-scan` | Pass / fail (HIGH/CRITICAL, fixed-only) | Trivy `--ignore-unfixed --exit-code 1`; runs against the built images, complements `make trivy-fs` (source scan) |
+
+The CI `docker` job builds + pushes signed images to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/{producer,consumer}` on every push to `main` (tagged `:latest` + `:sha-<short>`) and on every `v*` tag (tagged `:vX.Y.Z`). Every digest is signed with cosign keyless OIDC — see [CI/CD](#cicd) for the verify recipe.
+
 ## Available Make Targets
 
 Run `make help` to see all available targets.
@@ -216,7 +240,8 @@ Run `make help` to see all available targets.
 | `make test` | Run unit tests (Category=Unit, seconds) |
 | `make integration-test` | Run integration tests (Category=Integration, in-process `WebApplicationFactory`) |
 | `make image-build` | Build producer + consumer Docker images |
-| `make e2e` | Run Compose-based e2e (Kafka + Dapr sidecars + apps as containers) |
+| `make image-scan` | Trivy scan the built producer/consumer images (HIGH/CRITICAL, fixed-only) |
+| `make e2e` | Run Compose-based e2e (Kafka + Dapr sidecars + Jaeger + apps as containers) |
 | `make kind-up` | Create a KinD cluster with cloud-provider-kind + Dapr (Helm) + Kafka + producer/consumer applied |
 | `make kind-down` | Tear down the KinD cluster + cloud-provider-kind (also prunes `kindccm-*` orphans) |
 | `make e2e-kind` | Run the K8s e2e against the KinD cluster LoadBalancer IP (requires `kind-up` first) |
@@ -235,10 +260,11 @@ Run `make help` to see all available targets.
 | `make vulncheck` | Check for vulnerable NuGet packages |
 | `make trivy-fs` | Trivy filesystem scan (vuln, secret, misconfig) |
 | `make secrets` | Scan for committed secrets with gitleaks |
+| `make license-check` | Verify every source file carries an SPDX-License-Identifier header |
 | `make mermaid-lint` | Validate Mermaid diagrams in markdown files |
 | `make deps-prune` | Show redundant NuGet package references |
 | `make deps-prune-check` | Verify no redundant NuGet package references |
-| `make static-check` | Composite quality gate (lint + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
+| `make static-check` | Composite quality gate (lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
 
 ### Dapr & Kafka
 
@@ -274,7 +300,7 @@ Run `make help` to see all available targets.
 
 ## CI/CD
 
-GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check. A `changes` job (using `dorny/paths-filter`) gates heavy work so doc-only changes short-circuit cleanly while still satisfying the required `ci-pass` status check.
+GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, SPDX `license-check`, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check. A `changes` job (using `dorny/paths-filter`) gates heavy work so doc-only changes short-circuit cleanly while still satisfying the required `ci-pass` status check.
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
@@ -282,22 +308,40 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **static-check** | after `changes` (when `code==true`) | `make static-check` (composite quality gate) |
 | **build** | after `static-check` | `make build` |
 | **test** | after `static-check` | `make coverage-check` (runs all `Category=Unit` + `Category=Integration` tests, enforces 80% line threshold, uploads cobertura artifact) |
-| **e2e** | after `build` + `test` | `make e2e` (Compose-based: producer/consumer Docker images + Dapr sidecars + Kafka, asserts subscription delivery) |
-| **e2e-kind** | after `build` + `test` | `make kind-up && make e2e-kind` (KinD cluster + cloud-provider-kind + Helm-installed Dapr + Kafka manifest, asserts via LoadBalancer IP) |
+| **image-scan** | after `build` + `test` | `make image-scan` (Trivy against built producer/consumer images, HIGH/CRITICAL fixed-only) |
+| **e2e** | after `build` + `test` | `make e2e` (Compose-based: producer/consumer Docker images + Dapr sidecars + Kafka + Jaeger, asserts subscription delivery) |
+| **e2e-kind** | after `build` + `test` | `make kind-up && make e2e-kind` (KinD cluster + cloud-provider-kind + Helm-installed Dapr + Kafka manifest + Jaeger, asserts via LoadBalancer IP) |
+| **docker** | push to `main` and on `v*` tags, after all gates | Build + push producer/consumer to `ghcr.io/<owner>/<repo>/{producer,consumer}` with provenance + SBOM; cosign keyless OIDC sign every digest |
 | **ci-pass** | always, after all jobs | Gate job that fails if any upstream job failed OR was cancelled (single branch-protection check) |
 
-`build` and `test` run in parallel after `static-check` passes. `e2e` (Compose) and `e2e-kind` (KinD) then run in parallel — the Compose path takes ~1 min on GitHub-hosted runners; the KinD path takes ~3 min because it bootstraps a real cluster, installs Dapr via Helm, and waits for the producer LoadBalancer route. `ci-pass` gates on the full set so branch protection only needs to track a single check.
+`build` and `test` run in parallel after `static-check` passes. `image-scan`, `e2e` (Compose), and `e2e-kind` (KinD) then run in parallel — `image-scan` ~30s, the Compose path ~1 min, the KinD path ~3 min (bootstraps a real cluster, installs Dapr via Helm, waits for the producer LoadBalancer route). The `docker` job runs after all gates pass, but only on pushes to `main` and `v*` tags — pull requests don't push or sign. `ci-pass` gates on the full set so branch protection only needs to track a single check.
 
 A second workflow, `cleanup-runs.yml`, runs weekly on Sundays to delete workflow runs older than 7 days and to prune GitHub Actions caches from deleted/merged branches.
 
 ### Required Secrets and Variables
 
-No user-defined secrets or variables are required — workflows use only the built-in `GITHUB_TOKEN` provided automatically to every GitHub Actions run.
+No user-defined secrets or variables are required — workflows use only the built-in `GITHUB_TOKEN` provided automatically to every GitHub Actions run. The `docker` job uses GitHub's OIDC token (no long-lived signing key stored in the repo) to sign images with cosign keyless.
+
+### Verifying signed images
+
+Every digest pushed by the `docker` job is signed with cosign keyless OIDC, tying the signature to this repo's CI workflow. To verify locally:
+
+```bash
+cosign verify ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/producer:latest \
+  --certificate-identity-regexp 'https://github.com/AndriyKalashnykov/dapr-dotnet-pub-sub/\.github/workflows/ci\.yml@refs/(heads/main|tags/v.*)' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+`--certificate-identity-regexp` binds the signature to a specific workflow path inside this repo; `--certificate-oidc-issuer` confirms the cert came from GitHub Actions OIDC. Both flags are required — without the identity binding, anyone could sign an image with their own GitHub Actions and claim it's yours.
 
 ### Dependency Updates
 
-[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `mise` manager tracks Node, Dapr CLI, and act from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) via inline `# renovate:` comments.
+[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK (NuGet), Dapr runtime images (`daprio/{daprd,dapr,placement}`), .NET base images (`mcr.microsoft.com/dotnet/{sdk,aspnet}`), Jaeger, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `mise` manager tracks Node + the eight `aqua:` tool pins from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `DAPR_HELM_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) via inline `# renovate:` comments.
 
 ## Contributing
 
 Contributions welcome — open a PR.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Source files carry an SPDX header (`SPDX-License-Identifier: MIT`) so the license is machine-discoverable; `make license-check` enforces the header on every `.cs`, `.sh`, `Dockerfile`, and Makefile-style file.

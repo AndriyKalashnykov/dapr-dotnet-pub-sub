@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 using Dapr.Client;
 using Common;
 
