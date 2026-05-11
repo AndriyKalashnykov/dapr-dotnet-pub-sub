@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+  namespace: dapr-pubsub
+  labels:
+    app: consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "consumer"
+        dapr.io/app-port: "5231"
+        dapr.io/app-protocol: "http"
+        dapr.io/log-level: "warn"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: consumer
+          image: dapr-dotnet-pub-sub-consumer:e2e
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5231
+          env:
+            - name: DAPR_APP_PORT
+              value: "5231"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consumer
+  namespace: dapr-pubsub
+spec:
+  type: ClusterIP
+  selector:
+    app: consumer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5231
+      protocol: TCP

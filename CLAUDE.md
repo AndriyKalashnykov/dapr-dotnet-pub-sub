@@ -32,6 +32,9 @@ make coverage-check           # Run full suite with coverage and enforce 80% lin
 make image-build              # Build producer + consumer Docker images (used by e2e)
 make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + producer/consumer as containers)
 make e2e-sidecar              # Legacy real-sidecar e2e via dapr run -f . (Docker-image-free local fallback)
+make kind-up                  # Create KinD cluster with Dapr + Kafka + apps + cloud-provider-kind
+make kind-down                # Tear down KinD cluster + cloud-provider-kind orphans
+make e2e-kind                 # Run K8s e2e against KinD LoadBalancer IP (requires kind-up)
 make dapr-init                # Install pinned Dapr runtime (idempotent)
 make update                   # Update NuGet packages to latest versions
 make run                      # Build, stop previous, then run both apps via `dapr run -f .`
@@ -94,7 +97,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 - Dapr SDK: `Dapr.AspNetCore` 1.17.8
 - Kafka as the message broker (Confluent images)
 - Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e` → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars).
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `e2e`/`e2e-kind` (parallel) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars). The `e2e-kind` job brings up a KinD cluster with cloud-provider-kind + Helm-installed Dapr + Kafka manifest and asserts subscription delivery through the producer's LoadBalancer IP.
 - Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
 - Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.
@@ -109,7 +112,7 @@ Kafka stack in KRaft mode (no Zookeeper): Kafka (:9092), Kafka UI (:9080).
 ## Upgrade Backlog
 
 - [x] **Dockerize e2e: replace `dapr run -f .` with Docker Compose** — `compose/docker-compose.yml` brings up Kafka + Dapr sidecars (`network_mode: service:<app>`) + producer/consumer as containers; `scripts/e2e-compose.sh` asserts subscription routing via consumer-container log polling. `make image-build` builds the images; `make e2e` runs the full flow. `make e2e-sidecar` retained as the Docker-image-free fallback. The legacy `dapr run -f .` log-grep approach is gone from the e2e job.
-- [ ] **K8s e2e: deploy to KinD + cloud-provider-kind and run tests** — After Dockerfiles exist (previous item), create K8s manifests (`k8s/`) for producer, consumer, and Dapr components. Deploy onto a KinD cluster with cloud-provider-kind (for `ServiceType: LoadBalancer`) and Dapr installed via Helm. Run the e2e test script against the LoadBalancer IP. This validates manifest wiring, sidecar injection, service discovery, and subscription routing in a real cluster. Targets: `kind-up`, `kind-down`, `e2e` (promoted to KinD-based). Use `/makefile` skill Kubernetes Targets section for conventions.
+- [x] **K8s e2e: deploy to KinD + cloud-provider-kind and run tests** — `k8s/` manifests cover namespace, Kafka (KRaft StatefulSet using `confluentinc/cp-kafka`), Dapr Component + Subscription CRDs, and producer/consumer Deployments with `dapr.io/enabled` annotations. `scripts/kind-up.sh` creates the cluster, starts host cloud-provider-kind, installs Dapr via Helm, applies manifests, and waits for the producer LoadBalancer route. `scripts/e2e-kind.sh` asserts via `kubectl logs` polling. The `e2e-kind` CI job runs alongside `e2e` (Compose).
 
 ## Skills
 

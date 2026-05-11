@@ -11,7 +11,7 @@ export PATH := $(HOME)/.local/share/mise/shims:$(HOME)/.local/bin:$(PATH)
 # ---------------------------------------------------------------------------
 # .NET SDK version derived from global.json (single source of truth)
 DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1]"."v[2]; exit}' global.json 2>/dev/null)
-# Node, dapr CLI, and act are pinned in .mise.toml — Renovate's mise manager tracks them
+# Node, dapr CLI, act, kind, kubectl, helm, and cloud-provider-kind are pinned in .mise.toml
 # renovate: datasource=github-releases depName=dapr/dapr extractVersion=^v(?<version>.*)$
 DAPR_RUNTIME_VERSION := 1.17.4
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
@@ -20,6 +20,14 @@ TRIVY_VERSION      := 0.69.3
 GITLEAKS_VERSION   := 8.30.1
 # renovate: datasource=docker depName=minlag/mermaid-cli
 MERMAID_CLI_VERSION := 11.12.0
+# renovate: datasource=helm depName=dapr registryUrl=https://dapr.github.io/helm-charts
+DAPR_HELM_VERSION  := 1.17.4
+# KinD node image — bumped together with kind (see kind release notes)
+KIND_NODE_IMAGE    := kindest/node:v1.34.0
+KIND_CLUSTER_NAME  := dapr-pubsub
+# Use a per-cluster kubectl context to avoid clobbering kubeconfig across projects
+KUBECTL            := kubectl --context=kind-$(KIND_CLUSTER_NAME)
+HELM               := helm --kube-context=kind-$(KIND_CLUSTER_NAME)
 
 # ---------------------------------------------------------------------------
 # Project constants
@@ -124,6 +132,7 @@ trivy-fs: deps-docker
 		fs --scanners vuln,secret,misconfig \
 		--severity HIGH,CRITICAL \
 		--skip-dirs '**/bin,**/obj' \
+		--ignorefile /src/.trivyignore \
 		--exit-code 1 --no-progress /src
 
 #secrets: @ Scan for committed secrets with gitleaks
@@ -281,6 +290,21 @@ image-build: deps-docker
 e2e: deps-docker image-build
 	@bash scripts/e2e-compose.sh
 
+#kind-up: @ Create KinD cluster with Dapr + Kafka + producer/consumer (uses cloud-provider-kind for LoadBalancer)
+kind-up: deps-docker deps-tools image-build
+	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) \
+	 KIND_NODE_IMAGE=$(KIND_NODE_IMAGE) \
+	 DAPR_HELM_VERSION=$(DAPR_HELM_VERSION) \
+	 bash scripts/kind-up.sh
+
+#kind-down: @ Tear down the KinD cluster + cloud-provider-kind (prunes kindccm-* orphans)
+kind-down:
+	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) bash scripts/kind-down.sh
+
+#e2e-kind: @ Run K8s e2e against the KinD cluster (requires kind-up)
+e2e-kind: deps-docker deps-tools
+	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) bash scripts/e2e-kind.sh
+
 DAPR_LOG := /tmp/dapr-e2e.log
 
 #e2e-sidecar: @ Run legacy real-sidecar e2e (dapr run -f .) — kept for local-only flows without Docker images
@@ -328,7 +352,7 @@ ci-run: deps-act
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
-	for j in changes static-check build test e2e ci-pass; do \
+	for j in changes static-check build test e2e e2e-kind ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
 			--container-architecture linux/amd64 \
@@ -368,5 +392,5 @@ renovate-validate: renovate-bootstrap
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
         vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test e2e e2e-sidecar \
-        image-build coverage-check dapr-init update run post stop stop-dapr stop-apps kafka-start \
-        kafka-stop ci ci-run release renovate-bootstrap renovate-validate
+        e2e-kind kind-up kind-down image-build coverage-check dapr-init update run post stop stop-dapr \
+        stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

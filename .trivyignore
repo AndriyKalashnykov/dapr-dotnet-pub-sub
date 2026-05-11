@@ -1,0 +1,10 @@
+# Trivy findings explicitly suppressed for this project. Each entry must
+# document WHY the suppression is acceptable.
+
+# KSV-0014 — Kafka StatefulSet runs the confluentinc/cp-kafka entrypoint
+# which renders its server.properties into /etc/kafka at startup; mounting
+# emptyDir there hides the image's baked-in startup scripts and breaks
+# bootstrap. The cluster is an e2e-only test fixture (no PII, no production
+# traffic), so the readOnlyRootFilesystem hardening recommendation does not
+# apply. See k8s/kafka.yaml comment for the inline explanation.
+AVD-KSV-0014

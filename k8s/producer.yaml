@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: dapr-pubsub
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "producer"
+        dapr.io/app-port: "5232"
+        dapr.io/app-protocol: "http"
+        dapr.io/log-level: "warn"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: producer
+          image: dapr-dotnet-pub-sub-producer:e2e
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5232
+          env:
+            - name: DAPR_APP_PORT
+              value: "5232"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /dapr/config
+              port: 5232
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: producer
+  namespace: dapr-pubsub
+spec:
+  type: LoadBalancer
+  selector:
+    app: producer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5232
+      protocol: TCP

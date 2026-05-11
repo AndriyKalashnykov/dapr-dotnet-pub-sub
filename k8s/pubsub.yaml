@@ -1,0 +1,24 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: message-pubsub-kafka
+  namespace: dapr-pubsub
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "kafka.dapr-pubsub.svc.cluster.local:9092"
+    - name: consumerGroup
+      value: "order-group"
+    - name: authType
+      value: "none"
+    - name: clientID
+      value: "dapr-pubsub-client"
+    - name: disableTls
+      value: "true"
+    - name: initialOffset
+      value: "oldest"
+scopes:
+  - producer
+  - consumer
