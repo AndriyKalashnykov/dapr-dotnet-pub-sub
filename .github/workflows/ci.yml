@@ -38,7 +38,7 @@ jobs:
 
   static-check:
     needs: [changes]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -53,7 +53,7 @@ jobs:
 
   build:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -66,7 +66,7 @@ jobs:
 
   test:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -88,9 +88,27 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  image-test:
+    needs: [changes, build, test]
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: ./.github/actions/setup-dotnet-cached
+
+      - uses: jdx/mise-action@bfb9fa0b029db830a8c570757cee683df207a6c5 # v3
+        with:
+          install: true
+          cache: true
+
+      - name: Image-contract assertions (container-structure-test)
+        run: make image-test
+
   image-scan:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -103,7 +121,7 @@ jobs:
 
   e2e:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -121,7 +139,7 @@ jobs:
 
   e2e-kind:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -154,12 +172,12 @@ jobs:
         run: make kind-down
 
   docker:
-    needs: [changes, static-check, build, test, image-scan, e2e, e2e-kind]
+    needs: [changes, static-check, build, test, image-test, image-scan, e2e, e2e-kind]
     # Only build + push + sign on main pushes and on v* tags. Pull requests
     # do not push (the e2e job has already validated the image build).
     if: >-
       ${{ !failure() && !cancelled()
-        && needs.changes.outputs.code == 'true'
+        && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/v'))
         && (github.event_name == 'push' || github.event_name == 'workflow_call')
         && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
@@ -220,7 +238,7 @@ jobs:
 
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, image-scan, e2e, e2e-kind]
+    needs: [changes, static-check, build, test, image-test, image-scan, e2e, e2e-kind]
     timeout-minutes: 2
     runs-on: ubuntu-latest
     steps:

@@ -31,6 +31,7 @@ make test                     # Run unit tests (Category=Unit, seconds)
 make integration-test         # Run integration tests (Category=Integration, in-process WebApplicationFactory)
 make coverage-check           # Run full suite with coverage and enforce 80% line threshold
 make image-build              # Build producer + consumer Docker images (used by e2e)
+make image-test               # container-structure-test against built images (Dockerfile-contract assertions)
 make image-scan               # Trivy image scan (HIGH/CRITICAL fixed-only) against built producer/consumer images
 make e2e                      # Run Compose-based e2e (Kafka + Dapr sidecars + Jaeger + producer/consumer as containers)
 make kind-up                  # Create KinD cluster with Dapr + Kafka + apps + cloud-provider-kind
