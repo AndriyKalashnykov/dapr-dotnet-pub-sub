@@ -304,6 +304,16 @@ dapr-init: deps-run
 image-build: deps-docker
 	@docker compose --file compose/docker-compose.yml build producer consumer
 
+#image-test: @ Run container-structure-test against the built images (Dockerfile-contract assertions)
+image-test: deps-docker deps-tools image-build
+	@set -euo pipefail; \
+	for svc in producer consumer; do \
+		echo "Testing dapr-dotnet-pub-sub-$$svc:e2e..."; \
+		container-structure-test test \
+			--image "dapr-dotnet-pub-sub-$$svc:e2e" \
+			--config "compose/structure-test/$$svc.yaml"; \
+	done
+
 #image-scan: @ Trivy scan the built producer + consumer images (HIGH,CRITICAL, fixed-only)
 image-scan: deps-docker image-build
 	@set -euo pipefail; \
@@ -348,7 +358,7 @@ ci-run: deps-act
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
-	for j in changes static-check build test image-scan e2e e2e-kind ci-pass; do \
+	for j in changes static-check build test image-test image-scan e2e e2e-kind ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
 			--container-architecture linux/amd64 \
@@ -388,5 +398,5 @@ renovate-validate: renovate-bootstrap
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
         license-check vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test \
-        e2e e2e-kind kind-up kind-down image-build image-scan coverage-check dapr-init update run post stop \
+        e2e e2e-kind kind-up kind-down image-build image-test image-scan coverage-check dapr-init update run post stop \
         stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

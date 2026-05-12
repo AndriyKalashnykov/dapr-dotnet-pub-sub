@@ -240,6 +240,7 @@ Run `make help` to see all available targets.
 | `make test` | Run unit tests (Category=Unit, seconds) |
 | `make integration-test` | Run integration tests (Category=Integration, in-process `WebApplicationFactory`) |
 | `make image-build` | Build producer + consumer Docker images |
+| `make image-test` | Run container-structure-test (Dockerfile-contract assertions: user, ports, entrypoint, env, file existence) |
 | `make image-scan` | Trivy scan the built producer/consumer images (HIGH/CRITICAL, fixed-only) |
 | `make e2e` | Run Compose-based e2e (Kafka + Dapr sidecars + Jaeger + apps as containers) |
 | `make kind-up` | Create a KinD cluster with cloud-provider-kind + Dapr (Helm) + Kafka + producer/consumer applied |
@@ -308,6 +309,7 @@ GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pip
 | **static-check** | after `changes` (when `code==true`) | `make static-check` (composite quality gate) |
 | **build** | after `static-check` | `make build` |
 | **test** | after `static-check` | `make coverage-check` (runs all `Category=Unit` + `Category=Integration` tests, enforces 80% line threshold, uploads cobertura artifact) |
+| **image-test** | after `build` + `test` | `make image-test` (container-structure-test: Dockerfile-contract assertions on user, ports, entrypoint, env, file existence) |
 | **image-scan** | after `build` + `test` | `make image-scan` (Trivy against built producer/consumer images, HIGH/CRITICAL fixed-only) |
 | **e2e** | after `build` + `test` | `make e2e` (Compose-based: producer/consumer Docker images + Dapr sidecars + Kafka + Jaeger, asserts subscription delivery) |
 | **e2e-kind** | after `build` + `test` | `make kind-up && make e2e-kind` (KinD cluster + cloud-provider-kind + Helm-installed Dapr + Kafka manifest + Jaeger, asserts via LoadBalancer IP) |
@@ -337,6 +339,10 @@ cosign verify ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/producer:latest \
 ### Dependency Updates
 
 [Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK (NuGet), Dapr runtime images (`daprio/{daprd,dapr,placement}`), .NET base images (`mcr.microsoft.com/dotnet/{sdk,aspnet}`), Jaeger, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `mise` manager tracks Node + the eight `aqua:` tool pins from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `DAPR_HELM_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) via inline `# renovate:` comments.
+
+## Architecture Decisions
+
+Non-obvious decisions and traps (cp-kafka `enableServiceLinks: false`, Bitnami chart pivot, `initialOffset: oldest`, camelCase byte payload, `network_mode: service:<app>`, cloud-provider-kind binary mode, KSV-0014 suppression, cosign keyless choice, tag-push gating override, per-cluster kubectl context) are documented in [`docs/decisions.md`](docs/decisions.md).
 
 ## Contributing
 

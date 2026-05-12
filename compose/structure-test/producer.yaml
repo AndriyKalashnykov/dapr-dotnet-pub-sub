@@ -1,0 +1,33 @@
+schemaVersion: 2.0.0
+
+# Container-structure-test assertions for the producer image. Verifies the
+# Dockerfile contract independently of runtime behaviour (which the e2e
+# suite covers). Runs in CI as the `image-test` job parallel to e2e.
+
+metadataTest:
+  exposedPorts:
+    - "5232"
+  entrypoint:
+    - dotnet
+    - producer.dll
+  user: "1000:1000"
+  envVars:
+    - key: ASPNETCORE_URLS
+      value: "http://+:5232"
+    - key: DAPR_APP_PORT
+      value: "5232"
+
+fileExistenceTests:
+  - name: producer assembly present
+    path: /app/producer.dll
+    shouldExist: true
+  - name: common library present
+    path: /app/common.dll
+    shouldExist: true
+
+commandTests:
+  - name: dotnet ASP.NET Core runtime resolves
+    command: dotnet
+    args: ["--list-runtimes"]
+    expectedOutput:
+      - "Microsoft.AspNetCore.App 10\\."
