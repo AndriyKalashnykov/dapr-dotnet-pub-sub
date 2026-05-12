@@ -15,17 +15,17 @@ export PATH := $(HOME)/.local/share/mise/shims:$(HOME)/.local/bin:$(PATH)
 DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1]"."v[2]; exit}' global.json 2>/dev/null)
 # Node, dapr CLI, act, kind, kubectl, helm, and cloud-provider-kind are pinned in .mise.toml
 # renovate: datasource=github-releases depName=dapr/dapr extractVersion=^v(?<version>.*)$
-DAPR_RUNTIME_VERSION := 1.17.4
+DAPR_RUNTIME_VERSION := 1.17.6
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
-TRIVY_VERSION      := 0.69.3
+TRIVY_VERSION      := 0.70.0
 # renovate: datasource=github-releases depName=gitleaks/gitleaks extractVersion=^v(?<version>.*)$
 GITLEAKS_VERSION   := 8.30.1
 # renovate: datasource=docker depName=minlag/mermaid-cli
-MERMAID_CLI_VERSION := 11.12.0
+MERMAID_CLI_VERSION := 11.14.0
 # renovate: datasource=helm depName=dapr registryUrl=https://dapr.github.io/helm-charts
 DAPR_HELM_VERSION  := 1.17.4
 # KinD node image — bumped together with kind (see kind release notes)
-KIND_NODE_IMAGE    := kindest/node:v1.34.0
+KIND_NODE_IMAGE    := kindest/node:v1.35.0
 KIND_CLUSTER_NAME  := dapr-pubsub
 # Use a per-cluster kubectl context to avoid clobbering kubeconfig across projects
 KUBECTL            := kubectl --context=kind-$(KIND_CLUSTER_NAME)

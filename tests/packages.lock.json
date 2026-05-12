@@ -35,15 +35,15 @@
       },
       "TUnit": {
         "type": "Direct",
-        "requested": "[1.31.0, )",
-        "resolved": "1.31.0",
-        "contentHash": "arJG3i7ex9T1322qZAFdrnU3Yhh9Y1FcS/8jiKh5QkHmqme/Lor38QNFeIG3dXwpHz/jKdQ8+BnKCH+YhZEsNQ==",
+        "requested": "[1.44.0, )",
+        "resolved": "1.44.0",
+        "contentHash": "TLGw3s+dFWeEfVlolSoNYGJpdJ13EKlSY3yfzN5c73hZxQ4q19wm1iD1BfZ7oPOpNYUMJP45xSy5ALC2egI0CA==",
         "dependencies": {
           "Microsoft.Testing.Extensions.CodeCoverage": "18.6.2",
-          "Microsoft.Testing.Extensions.Telemetry": "2.2.1",
-          "Microsoft.Testing.Extensions.TrxReport": "2.2.1",
-          "TUnit.Assertions": "1.31.0",
-          "TUnit.Engine": "1.31.0"
+          "Microsoft.Testing.Extensions.Telemetry": "2.2.2",
+          "Microsoft.Testing.Extensions.TrxReport": "2.2.2",
+          "TUnit.Assertions": "1.44.0",
+          "TUnit.Engine": "1.44.0"
         }
       },
       "Castle.Core": {
@@ -56,11 +56,11 @@
       },
       "Dapr.AspNetCore": {
         "type": "Transitive",
-        "resolved": "1.17.8",
-        "contentHash": "xIDDhPn2UX0o5iyLfZXq3XEK3hGlCV2eeDHP33ggNme7cnAwnXy64bXs6W2/NtO4RQdrBU9SGV7bxw6Pd3cyGQ==",
+        "resolved": "1.17.9",
+        "contentHash": "9YqQ+7fDs/ci5ebavcoIz0ykj2BwFxrCpccG4FowcSP0lf947ygsFjN/2aRBz0kjSB7GZsxslq6uTaFLJY6E7g==",
         "dependencies": {
-          "Dapr.Client": "1.17.8",
-          "Dapr.Common": "1.17.8",
+          "Dapr.Client": "1.17.9",
+          "Dapr.Common": "1.17.9",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0"
@@ -68,11 +68,11 @@
       },
       "Dapr.Client": {
         "type": "Transitive",
-        "resolved": "1.17.8",
-        "contentHash": "x1DJiTfFfWuKMqV5+QucnYb2/AZGC/1rlvQCHax8axkHwlDUYUDhiU8HJoqeN0jMRoF3NW6oN0Ya1r8qkGz4fQ==",
+        "resolved": "1.17.9",
+        "contentHash": "hfmnGnuij8jqiKSONfLAB5rzse+NtjbpDj0+7CC808aqSzw8+PKH5pSX/7tqS3Z4TX4E5CU12cmRfQ9DpfVkDQ==",
         "dependencies": {
-          "Dapr.Common": "1.17.8",
-          "Dapr.Protos": "1.17.8",
+          "Dapr.Common": "1.17.9",
+          "Dapr.Protos": "1.17.9",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0",
@@ -88,10 +88,10 @@
       },
       "Dapr.Common": {
         "type": "Transitive",
-        "resolved": "1.17.8",
-        "contentHash": "W4IQICNwgFHDI76Ig0HrMEfRvZOj1E2hJIlMPLPLxTV0BLX0tEfgSHdLNyHdGGGd8L9VG/R3ujVEH1GZek+n0g==",
+        "resolved": "1.17.9",
+        "contentHash": "0KluEFOk6Dvgqpkmq12VPtaIO+LNEfjAVCQtXJJiQmRAFLBKvRCrlL4b2BOyozn2ccRBO1d1M3D+2WxfG70NMA==",
         "dependencies": {
-          "Dapr.Protos": "1.17.8",
+          "Dapr.Protos": "1.17.9",
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
           "Grpc.Net.Client": "2.76.0",
@@ -107,8 +107,8 @@
       },
       "Dapr.Protos": {
         "type": "Transitive",
-        "resolved": "1.17.8",
-        "contentHash": "4ao8NFFL1cI4WIsPj349OGHAVlbRJrxjxmegire6+8mvlXv97K7950WSwa+Jphite7g/V7YLuukSoKC1ZB7L6g==",
+        "resolved": "1.17.9",
+        "contentHash": "SbuEevY/tNubnaqt2QFj6TK8GcHRibwhH2T61LKQByMCazTFdHuhmI2FQ8eo3LA9dEipS7wROAHbTkHvon/Iag==",
         "dependencies": {
           "Google.Api.CommonProtos": "2.17.0",
           "Google.Protobuf": "3.34.0",
@@ -471,41 +471,41 @@
       },
       "Microsoft.Testing.Extensions.Telemetry": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "7zB8BjffOyvqfHF26rFVPuK0w1fCf5+j1tLuhHIr76CqxXkGb+fMJtq6YNOV+m6qPytExHMXxluk3RgJ+dSIqw==",
+        "resolved": "2.2.2",
+        "contentHash": "qKRghdaDiC88N1s3LDJO7zW74QNZu/ErnTxuG7R9u9UORn6pTwdqbi7X+eY4UQb+7YV2gR2yz8eRelvOWQVxhA==",
         "dependencies": {
           "Microsoft.ApplicationInsights": "2.23.0",
-          "Microsoft.Testing.Platform": "2.2.1"
+          "Microsoft.Testing.Platform": "2.2.2"
         }
       },
       "Microsoft.Testing.Extensions.TrxReport": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "FWaktPQHSiZh/+2ft2PHH/4bLlg8BKlrbLiil8mRcpoP0oHzKpgBfmN3QepGlAbxG0yDrZGN8tuPy77FYdEaMw==",
+        "resolved": "2.2.2",
+        "contentHash": "iEp69l8C0OlEnqUgZVoh621PrFIbaIbhjShUkW9pgPwH1GGLawLbi7cW1wyzLxZLI3jVSuKqV/JbSFz8Ael7Kg==",
         "dependencies": {
-          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.2.1",
-          "Microsoft.Testing.Platform": "2.2.1"
+          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.2.2",
+          "Microsoft.Testing.Platform": "2.2.2"
         }
       },
       "Microsoft.Testing.Extensions.TrxReport.Abstractions": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "RD6D1Jx6cKDA5IHd1H2q8ylIuQG3PD+gdULI0JC8CvsRtaypFzTFpB5xDPuQi8o6kAkcM04cBhAiJPxZboNH2Q==",
+        "resolved": "2.2.2",
+        "contentHash": "MuOC3Be70FPysaPxaO0f3GFoXU49UwnKCVDWfFrOZ93h955KZ6MKiJ6vwt/2r4e1wkLDoJFbkQzi/MNbpe4oXQ==",
         "dependencies": {
-          "Microsoft.Testing.Platform": "2.2.1"
+          "Microsoft.Testing.Platform": "2.2.2"
         }
       },
       "Microsoft.Testing.Platform": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "9bbPuls/b6/vUFzxbSjJLZlJHyKBfOZE5kjIY+ITI2ASqlFPJhR83BdLydJeQOCLEZhEbrEcz5xtt1B69nwSVg=="
+        "resolved": "2.2.2",
+        "contentHash": "9mUsTOri0aVqBX7/EJwqVJxVwdOzGUVJqK1H2EMfIl9xxJuSdqhfAlJbukl/iNugvi4+cmQs/LI8PLTDUT9P1A=="
       },
       "Microsoft.Testing.Platform.MSBuild": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "CSJOcZHfKlTyPbS0CTJk6iEnU4gJC+eUA5z72UBnMDRdgVHYOmB8k9Y7jT233gZjnCOQiYFg3acQHRfu2H62nw==",
+        "resolved": "2.2.2",
+        "contentHash": "acgkTLYA8C39oe5b5ISmydBshR0XO6v8z3/CXAsLmPQ3xAiomHuPoTAgY28tjQLcwPZOu4GX034BXWvmsVpzIg==",
         "dependencies": {
-          "Microsoft.Testing.Platform": "2.2.1"
+          "Microsoft.Testing.Platform": "2.2.2"
         }
       },
       "System.Diagnostics.EventLog": {
@@ -515,43 +515,43 @@
       },
       "TUnit.Assertions": {
         "type": "Transitive",
-        "resolved": "1.31.0",
-        "contentHash": "l9LsIK2t4MsEMEoxFtuyaVfmW03Ky8Iztmy6fqw5uUnj79QtEHNyQsCr0GUIvx0SQh27S0RPf1KiOiiKdwqnlA=="
+        "resolved": "1.44.0",
+        "contentHash": "fG19poW1AuhIPv9+Hj8bYv0o/25P8+gzsmMPeV0KxJ0KiFn5Mx4qZ6OJg1+5doAd4MC6moZr44X5aEd1AF6eiA=="
       },
       "TUnit.Core": {
         "type": "Transitive",
-        "resolved": "1.31.0",
-        "contentHash": "DLWKisvWX4wl3MspfXdJw+ajae66pDahTAeo+rZjnlyomW40QdEZP/Pc0rWh9kT4AFIUJJDV5aSZgC+xlGFlBQ=="
+        "resolved": "1.44.0",
+        "contentHash": "qZtXrwGe9wdXmjB7uW1pZkLTlYCI31xBEKLIyB444klERmbWQ6gTM7wpJRUl1bTv4+1oW/vb/IaA77pv/ioBdw=="
       },
       "TUnit.Engine": {
         "type": "Transitive",
-        "resolved": "1.31.0",
-        "contentHash": "0J4KBvguk05tXT03YguhNM4zwJMzNwB+w1r4vGakeYPmb6Jf/Oz5loFcg5K3ODXO+/shuyF4SXLczLLSEBS5JQ==",
+        "resolved": "1.44.0",
+        "contentHash": "tAtLUEmewmK4JFcgB1/RMIwC4+c4Vq+K2tTDtiA99Ift1puWb4osj5KItfOxuz9G0VqkD1jkh0Fx8xztD0o4IA==",
         "dependencies": {
           "EnumerableAsyncProcessor": "3.8.4",
-          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.2.1",
-          "Microsoft.Testing.Platform": "2.2.1",
-          "Microsoft.Testing.Platform.MSBuild": "2.2.1",
-          "TUnit.Core": "1.31.0"
+          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.2.2",
+          "Microsoft.Testing.Platform": "2.2.2",
+          "Microsoft.Testing.Platform.MSBuild": "2.2.2",
+          "TUnit.Core": "1.44.0"
         }
       },
       "common": {
         "type": "Project",
         "dependencies": {
-          "Dapr.AspNetCore": "[1.17.8, )"
+          "Dapr.AspNetCore": "[1.17.9, )"
         }
       },
       "consumer": {
         "type": "Project",
         "dependencies": {
-          "Dapr.AspNetCore": "[1.17.8, )",
+          "Dapr.AspNetCore": "[1.17.9, )",
           "common": "[1.0.0, )"
         }
       },
       "producer": {
         "type": "Project",
         "dependencies": {
-          "Dapr.AspNetCore": "[1.17.8, )",
+          "Dapr.AspNetCore": "[1.17.9, )",
           "common": "[1.0.0, )"
         }
       }
