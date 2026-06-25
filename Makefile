@@ -16,8 +16,10 @@ DOTNET_VERSION     := $(shell awk -F'"' '/"version"/{split($$4,v,"."); print v[1
 # Node, dapr CLI, act, kind, kubectl, helm, and cloud-provider-kind are pinned in .mise.toml
 # renovate: datasource=github-releases depName=dapr/dapr extractVersion=^v(?<version>.*)$
 DAPR_RUNTIME_VERSION := 1.17.6
+# Consumed via 'docker run' (containerised scanner) — intentionally NOT a mise host pin
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
 TRIVY_VERSION      := 0.70.0
+# Consumed via 'docker run' (containerised scanner) — intentionally NOT a mise host pin
 # renovate: datasource=github-releases depName=gitleaks/gitleaks extractVersion=^v(?<version>.*)$
 GITLEAKS_VERSION   := 8.30.1
 # renovate: datasource=docker depName=minlag/mermaid-cli
@@ -25,7 +27,11 @@ MERMAID_CLI_VERSION := 11.14.0
 # renovate: datasource=helm depName=dapr registryUrl=https://dapr.github.io/helm-charts
 DAPR_HELM_VERSION  := 1.17.4
 # KinD node image — bumped together with kind (see kind release notes)
-KIND_NODE_IMAGE    := kindest/node:v1.35.0
+# renovate: datasource=docker depName=kindest/node
+KIND_NODE_IMAGE    := kindest/node:v1.35.0@sha256:4613778f3cfcd10e615029370f5786704559103cf27bef934597ba562b269661
+# act runner image for 'make ci-run' (ubuntu-latest maps to ubuntu-24.04)
+# renovate: datasource=docker depName=catthehacker/ubuntu versioning=loose
+ACT_UBUNTU_VERSION := act-24.04-20260622
 KIND_CLUSTER_NAME  := dapr-pubsub
 # Use a per-cluster kubectl context to avoid clobbering kubeconfig across projects
 KUBECTL            := kubectl --context=kind-$(KIND_CLUSTER_NAME)
@@ -194,8 +200,26 @@ license-check:
 	fi; \
 	echo "License check passed: all tracked source files carry an SPDX header."
 
-#static-check: @ Composite quality gate (lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check)
-static-check: lint license-check vulncheck trivy-fs secrets mermaid-lint deps-prune-check
+#check-dotnet-alignment: @ Verify .NET major.minor matches across global.json and both Dockerfiles
+check-dotnet-alignment:
+	@set -euo pipefail; \
+	GJ="$(DOTNET_VERSION)"; \
+	if [ -z "$$GJ" ]; then echo "ERROR: could not derive .NET version from global.json"; exit 1; fi; \
+	FAIL=0; \
+	for df in producer/Dockerfile consumer/Dockerfile; do \
+		DV=$$(awk -F= '/^ARG DOTNET_VERSION=/{print $$2; exit}' "$$df"); \
+		if [ "$$DV" != "$$GJ" ]; then \
+			echo "MISMATCH: $$df has ARG DOTNET_VERSION=$$DV but global.json pins $$GJ"; \
+			FAIL=1; \
+		fi; \
+	done; \
+	if [ "$$FAIL" -ne 0 ]; then \
+		echo "ERROR: .NET version drift across global.json and Dockerfiles."; exit 1; \
+	fi; \
+	echo ".NET version aligned ($$GJ) across global.json + producer/consumer Dockerfiles."
+
+#static-check: @ Composite quality gate (check-dotnet-alignment + lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check)
+static-check: check-dotnet-alignment lint license-check vulncheck trivy-fs secrets mermaid-lint deps-prune-check
 	@echo "All static checks passed."
 
 #build: @ Restore and build entire solution
@@ -336,7 +360,6 @@ e2e: deps-docker image-build
 	@bash scripts/e2e-compose.sh
 
 #kind-up: @ Create KinD cluster with Dapr + Kafka + producer/consumer (uses cloud-provider-kind for LoadBalancer)
-
 kind-up: deps-docker deps-tools image-build
 	@KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) \
 	 KIND_NODE_IMAGE=$(KIND_NODE_IMAGE) \
@@ -355,12 +378,26 @@ e2e-kind: deps-docker deps-tools
 ci-run: deps-act
 	@set -euo pipefail; \
 	docker container prune -f 2>/dev/null || true; \
+	GITHUB_TOKEN="$${GITHUB_TOKEN:-$$(gh auth token 2>/dev/null || true)}"; \
+	if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "ERROR: GITHUB_TOKEN unset and 'gh auth token' returned nothing."; \
+		echo "       act's 'mise install' (aqua: backends) needs it to avoid GitHub's"; \
+		echo "       60-req/hr anonymous API limit (HTTP 403). Run 'gh auth login' or export GITHUB_TOKEN."; \
+		exit 1; \
+	fi; \
+	export GITHUB_TOKEN; \
 	ACT_PORT=$$(shuf -i 40000-59999 -n 1); \
 	ARTIFACT_PATH=$$(mktemp -d -t act-artifacts.XXXXXX); \
+	EVENT_JSON=$$(mktemp -t act-event.XXXXXX.json); \
+	trap 'rm -rf "$$ARTIFACT_PATH" "$$EVENT_JSON"' EXIT; \
+	printf '{"ref":"refs/heads/main","repository":{"default_branch":"main","name":"$(APP_NAME)","full_name":"AndriyKalashnykov/$(APP_NAME)"}}\n' > "$$EVENT_JSON"; \
 	echo "Using artifact server port $$ACT_PORT and path $$ARTIFACT_PATH"; \
 	for j in changes static-check build test image-test image-scan e2e e2e-kind ci-pass; do \
 		echo "==== act push --job $$j ===="; \
 		act push --job "$$j" \
+			--eventpath "$$EVENT_JSON" \
+			-P ubuntu-latest=catthehacker/ubuntu:$(ACT_UBUNTU_VERSION) \
+			--secret GITHUB_TOKEN \
 			--container-architecture linux/amd64 \
 			--pull=false \
 			--artifact-server-port "$$ACT_PORT" \
@@ -397,6 +434,6 @@ renovate-validate: renovate-bootstrap
 	fi
 
 .PHONY: help deps deps-docker deps-run deps-tools deps-act deps-prune deps-prune-check clean format lint \
-        license-check vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test \
+        check-dotnet-alignment license-check vulncheck trivy-fs secrets mermaid-lint static-check build test integration-test \
         e2e e2e-kind kind-up kind-down image-build image-test image-scan coverage-check dapr-init update run post stop \
         stop-dapr stop-apps kafka-start kafka-stop ci ci-run release renovate-bootstrap renovate-validate

@@ -27,12 +27,12 @@ services:
       start_period: 30s
 
   placement:
-    image: daprio/dapr:1.17.4
+    image: daprio/dapr:1.17.4@sha256:8e4da92d1e15a7aca7ecf416947d14d5a5db83ae502283219724d9608ff0e7d1
     container_name: e2e-placement
     command: ["./placement", "--port", "50006"]
 
   jaeger:
-    image: jaegertracing/jaeger:2.17.0
+    image: jaegertracing/jaeger:2.17.0@sha256:6266573208d665ce5c17483bce0a75d0806480d92c84766d288d0aee885ce708
     container_name: e2e-jaeger
     ports:
       - "16686:16686"
@@ -55,7 +55,7 @@ services:
       DAPR_HTTP_PORT: "3532"
 
   producer-dapr:
-    image: daprio/daprd:1.17.4
+    image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
     container_name: e2e-producer-dapr
     network_mode: "service:producer"
     depends_on:
@@ -91,7 +91,7 @@ services:
       DAPR_HTTP_PORT: "3531"
 
   consumer-dapr:
-    image: daprio/daprd:1.17.4
+    image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
     container_name: e2e-consumer-dapr
     network_mode: "service:consumer"
     depends_on:
