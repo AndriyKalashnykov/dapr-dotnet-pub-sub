@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 ARG DOTNET_VERSION=10.0
 
-FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}@sha256:ea8bde36c11b6e7eec2656d0e59101d4462f6bd630730f2c8201ed0572b295d5 AS build
 WORKDIR /src
 
 COPY Directory.Build.props ./
@@ -20,14 +20,16 @@ RUN dotnet publish consumer/consumer.csproj \
     -o /app/publish \
     /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}@sha256:7644f992230d35cf230017189d4038c0ae0f7388b13f4f7ae1900a155bafb597 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+COPY --chown=1000:1000 --from=build /app/publish .
 
 USER 1000:1000
 
-ENV ASPNETCORE_URLS=http://+:5231 \
-    DAPR_APP_PORT=5231
-EXPOSE 5231
+# App listen port — operator-tunable at build time; mirrors compose/.env.example.
+ARG APP_INTERNAL_PORT=5231
+ENV ASPNETCORE_URLS=http://+:${APP_INTERNAL_PORT} \
+    DAPR_APP_PORT=${APP_INTERNAL_PORT}
+EXPOSE ${APP_INTERNAL_PORT}
 
 ENTRYPOINT ["dotnet", "consumer.dll"]

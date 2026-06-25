@@ -29,13 +29,13 @@ services:
   placement:
     image: daprio/dapr:1.17.4@sha256:8e4da92d1e15a7aca7ecf416947d14d5a5db83ae502283219724d9608ff0e7d1
     container_name: e2e-placement
-    command: ["./placement", "--port", "50006"]
+    command: ["./placement", "--port", "${PLACEMENT_PORT:-50006}"]
 
   jaeger:
     image: jaegertracing/jaeger:2.17.0@sha256:6266573208d665ce5c17483bce0a75d0806480d92c84766d288d0aee885ce708
     container_name: e2e-jaeger
     ports:
-      - "16686:16686"
+      - "${JAEGER_HOST_PORT:-16686}:16686"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
 
@@ -44,15 +44,22 @@ services:
     build:
       context: ..
       dockerfile: producer/Dockerfile
+      args:
+        APP_INTERNAL_PORT: "${PRODUCER_APP_PORT:-5232}"
     container_name: e2e-producer
     depends_on:
       kafka:
         condition: service_healthy
     ports:
-      - "5232:5232"
+      - "${PRODUCER_HOST_PORT:-5232}:${PRODUCER_APP_PORT:-5232}"
+      # Producer Dapr sidecar HTTP API (shares this container's netns via
+      # network_mode below). Exposed so the e2e can publish through the
+      # sidecar's TRACED ingress and assert spans land in Jaeger — the app's
+      # DaprClient publish (gRPC) is not traced without app-side OTel.
+      - "${PRODUCER_DAPR_HTTP_PORT:-3532}:${PRODUCER_DAPR_HTTP_PORT:-3532}"
     environment:
-      DAPR_APP_PORT: "5232"
-      DAPR_HTTP_PORT: "3532"
+      DAPR_APP_PORT: "${PRODUCER_APP_PORT:-5232}"
+      DAPR_HTTP_PORT: "${PRODUCER_DAPR_HTTP_PORT:-3532}"
 
   producer-dapr:
     image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
@@ -68,9 +75,9 @@ services:
     command:
       - "./daprd"
       - "--app-id=producer"
-      - "--app-port=5232"
-      - "--dapr-http-port=3532"
-      - "--placement-host-address=placement:50006"
+      - "--app-port=${PRODUCER_APP_PORT:-5232}"
+      - "--dapr-http-port=${PRODUCER_DAPR_HTTP_PORT:-3532}"
+      - "--placement-host-address=placement:${PLACEMENT_PORT:-50006}"
       - "--resources-path=/components"
       - "--config=/components/config.yaml"
       - "--log-level=info"
@@ -80,15 +87,17 @@ services:
     build:
       context: ..
       dockerfile: consumer/Dockerfile
+      args:
+        APP_INTERNAL_PORT: "${CONSUMER_APP_PORT:-5231}"
     container_name: e2e-consumer
     depends_on:
       kafka:
         condition: service_healthy
     ports:
-      - "5231:5231"
+      - "${CONSUMER_HOST_PORT:-5231}:${CONSUMER_APP_PORT:-5231}"
     environment:
-      DAPR_APP_PORT: "5231"
-      DAPR_HTTP_PORT: "3531"
+      DAPR_APP_PORT: "${CONSUMER_APP_PORT:-5231}"
+      DAPR_HTTP_PORT: "${CONSUMER_DAPR_HTTP_PORT:-3531}"
 
   consumer-dapr:
     image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
@@ -104,9 +113,9 @@ services:
     command:
       - "./daprd"
       - "--app-id=consumer"
-      - "--app-port=5231"
-      - "--dapr-http-port=3531"
-      - "--placement-host-address=placement:50006"
+      - "--app-port=${CONSUMER_APP_PORT:-5231}"
+      - "--dapr-http-port=${CONSUMER_DAPR_HTTP_PORT:-3531}"
+      - "--placement-host-address=placement:${PLACEMENT_PORT:-50006}"
       - "--resources-path=/components"
       - "--config=/components/config.yaml"
       - "--log-level=info"
