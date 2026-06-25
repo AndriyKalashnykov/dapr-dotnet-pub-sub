@@ -41,6 +41,14 @@ spec:
               value: "5231"
             - name: DAPR_HTTP_PORT
               value: "3500"
+            # App-side OpenTelemetry — exports the app's own HTTP spans to the
+            # same Jaeger OTLP endpoint the Dapr sidecar uses (k8s/config.yaml).
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger.dapr-pubsub.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_SERVICE_NAME
+              value: "consumer"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

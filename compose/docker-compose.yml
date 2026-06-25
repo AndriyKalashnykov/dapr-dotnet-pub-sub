@@ -52,14 +52,14 @@ services:
         condition: service_healthy
     ports:
       - "${PRODUCER_HOST_PORT:-5232}:${PRODUCER_APP_PORT:-5232}"
-      # Producer Dapr sidecar HTTP API (shares this container's netns via
-      # network_mode below). Exposed so the e2e can publish through the
-      # sidecar's TRACED ingress and assert spans land in Jaeger — the app's
-      # DaprClient publish (gRPC) is not traced without app-side OTel.
-      - "${PRODUCER_DAPR_HTTP_PORT:-3532}:${PRODUCER_DAPR_HTTP_PORT:-3532}"
     environment:
       DAPR_APP_PORT: "${PRODUCER_APP_PORT:-5232}"
       DAPR_HTTP_PORT: "${PRODUCER_DAPR_HTTP_PORT:-3532}"
+      # App-side OpenTelemetry — the app's own HTTP spans export here so the real
+      # /send flow is traced (complements the Dapr sidecar's pub/sub spans).
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}"
+      OTEL_SERVICE_NAME: "producer"
 
   producer-dapr:
     image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
@@ -98,6 +98,10 @@ services:
     environment:
       DAPR_APP_PORT: "${CONSUMER_APP_PORT:-5231}"
       DAPR_HTTP_PORT: "${CONSUMER_DAPR_HTTP_PORT:-3531}"
+      # App-side OpenTelemetry — exports the consumer's handler spans.
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}"
+      OTEL_SERVICE_NAME: "consumer"
 
   consumer-dapr:
     image: daprio/daprd:1.17.4@sha256:d7041f5ada969802f7d2d125054b350769eeab90c8d52a99a5fb1805127945b2
