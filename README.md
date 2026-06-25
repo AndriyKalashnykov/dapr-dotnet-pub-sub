@@ -33,17 +33,17 @@ Visit the [Dapr Pub/Sub documentation](https://docs.dapr.io/developing-applicati
 
 | Component | Technology |
 |-----------|------------|
-| Language | .NET 10 (pinned via `global.json` → `10.0.201`, `rollForward: latestFeature`) |
+| Language | .NET 10 (pinned via `global.json` → `10.0.203`, `rollForward: latestFeature`) |
 | Framework | ASP.NET Core Web API |
-| Pub/Sub | [Dapr](https://dapr.io/) 1.17.8 (`Dapr.AspNetCore`) |
+| Pub/Sub | [Dapr](https://dapr.io/) 1.17.9 (`Dapr.AspNetCore`) |
 | Message Broker | Apache Kafka (KRaft mode, Confluent images) |
-| Testing | [TUnit](https://tunit.dev/) 1.31.0 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
+| Testing | [TUnit](https://tunit.dev/) 1.44.0 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5 |
 | Mocking | [FakeItEasy](https://fakeiteasy.github.io/) 9.0.1 |
 | Infrastructure | Docker Compose (Kafka + Kafka UI + Jaeger v2) |
 | Observability | OpenTelemetry → [Jaeger v2](https://www.jaegertracing.io/) (OTLP gRPC, all-in-one) |
-| Tool management | [mise](https://mise.jdx.dev/) (Node, Dapr CLI, act, kind, kubectl, helm, cloud-provider-kind, cosign per `.mise.toml`) |
+| Tool management | [mise](https://mise.jdx.dev/) (Node, Dapr CLI, act, kind, kubectl, helm, cloud-provider-kind, cosign, container-structure-test per `.mise.toml`) |
 | CI/CD | GitHub Actions with cosign keyless OIDC image signing |
-| Dependencies | [Renovate](https://docs.renovatebot.com/) with platform automerge |
+| Dependencies | [Renovate](https://docs.renovatebot.com/) with automerge |
 | Static Analysis | `dotnet format`, Trivy (fs + image, vuln/secret/misconfig), gitleaks, mermaid-cli, SPDX license-check |
 
 ## Quick Start
@@ -226,7 +226,7 @@ The build pipeline produces three artefact tiers, each gated by its own `make` t
 | OCI image | `make image-build` | `dapr-dotnet-pub-sub-{producer,consumer}:e2e` (local Docker daemon) | Multi-stage Dockerfile per service; non-root user 1000 |
 | Image scan | `make image-scan` | Pass / fail (HIGH/CRITICAL, fixed-only) | Trivy `--ignore-unfixed --exit-code 1`; runs against the built images, complements `make trivy-fs` (source scan) |
 
-The CI `docker` job builds + pushes signed images to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/{producer,consumer}` on every push to `main` (tagged `:latest` + `:sha-<short>`) and on every `v*` tag (tagged `:vX.Y.Z`). Every digest is signed with cosign keyless OIDC — see [CI/CD](#cicd) for the verify recipe.
+The CI `docker` job builds + pushes signed multi-arch (`linux/amd64,linux/arm64`) images to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/{producer,consumer}` on every push to `main` (tagged `:latest` + `:sha-<short>`) and on every `v*` tag (tagged with bare semver `:X.Y.Z` + `:X.Y` + `:X`). Every digest is signed with cosign keyless OIDC — see [CI/CD](#cicd) for the verify recipe.
 
 ## Available Make Targets
 
@@ -265,7 +265,7 @@ Run `make help` to see all available targets.
 | `make mermaid-lint` | Validate Mermaid diagrams in markdown files |
 | `make deps-prune` | Show redundant NuGet package references |
 | `make deps-prune-check` | Verify no redundant NuGet package references |
-| `make static-check` | Composite quality gate (lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
+| `make static-check` | Composite quality gate (check-dotnet-alignment + lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check) |
 
 ### Dapr & Kafka
 
@@ -301,7 +301,7 @@ Run `make help` to see all available targets.
 
 ## CI/CD
 
-GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: format verification, warnings-as-errors build, SPDX `license-check`, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check. A `changes` job (using `dorny/paths-filter`) gates heavy work so doc-only changes short-circuit cleanly while still satisfying the required `ci-pass` status check.
+GitHub Actions runs on every push to `main`, tag `v*`, and pull request. The pipeline uses a composite quality gate that bundles all static checks into a single `make static-check` step: .NET version-alignment check (global.json ↔ both Dockerfiles), format verification, warnings-as-errors build, SPDX `license-check`, vulnerability scan, Trivy filesystem scan (vuln + secret + misconfig), gitleaks secrets scan, Mermaid diagram lint, and redundant package check. A `changes` job (using `dorny/paths-filter`) gates heavy work so doc-only changes short-circuit cleanly while still satisfying the required `ci-pass` status check.
 
 | Job | Triggers | Steps |
 |-----|----------|-------|
@@ -338,7 +338,7 @@ cosign verify ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/producer:latest \
 
 ### Dependency Updates
 
-[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `platformAutomerge` enabled. It groups GitHub Actions, TUnit, Dapr SDK (NuGet), Dapr runtime images (`daprio/{daprd,dapr,placement}`), .NET base images (`mcr.microsoft.com/dotnet/{sdk,aspnet}`), Jaeger, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `mise` manager tracks Node + the eight `aqua:` tool pins from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `DAPR_HELM_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) via inline `# renovate:` comments.
+[Renovate](https://docs.renovatebot.com/) keeps dependencies up to date with `automerge` enabled (merged via Renovate's own post-CI run — `platformAutomerge` is off to avoid the check-registration race). It groups GitHub Actions, TUnit, Dapr SDK (NuGet), Dapr runtime images (`daprio/{daprd,dapr,placement}`), .NET base images (`mcr.microsoft.com/dotnet/{sdk,aspnet}`), Jaeger, Docker Compose images, mise tools, and Makefile tool versions into single PRs. The `kubernetes` manager tracks the third-party images in `k8s/*.yaml` (`confluentinc/cp-kafka`, `jaegertracing/jaeger`); the `mise` manager tracks Node + the eight `aqua:` tool pins from `.mise.toml`; a custom regex manager updates the remaining Makefile tool constants (`DAPR_RUNTIME_VERSION`, `DAPR_HELM_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`, `KIND_NODE_IMAGE`, `ACT_UBUNTU_VERSION`) via inline `# renovate:` comments.
 
 ## Architecture Decisions
 

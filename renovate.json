@@ -12,7 +12,7 @@
   ],
   "prConcurrentLimit": 50,
   "prHourlyLimit": 0,
-  "platformAutomerge": true,
+  "platformAutomerge": false,
   "automerge": true,
   "automergeType": "pr",
   "automergeStrategy": "squash",
@@ -22,12 +22,18 @@
     "nuget",
     "dockerfile",
     "docker-compose",
+    "kubernetes",
     "mise",
     "custom.regex"
   ],
   "dockerfile": {
     "managerFilePatterns": [
       "/(^|/)Dockerfile(\\..+)?$/"
+    ]
+  },
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/^k8s/.+\\.ya?ml$/"
     ]
   },
   "docker-compose": {
@@ -117,6 +123,24 @@
         "jaegertracing/all-in-one"
       ],
       "groupName": "Jaeger"
+    },
+    {
+      "description": "Locally-built e2e images (kind-loaded) are not in any registry — Renovate cannot resolve them",
+      "matchPackageNames": [
+        "dapr-dotnet-pub-sub-producer",
+        "dapr-dotnet-pub-sub-consumer"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Makefile docker dev-tools (mermaid-cli, act runner) are version-pinned, not digest-pinned; the docker:pinDigests preset otherwise collides with and silently drops the version bump (dapr-nodejs-nextjs trap). Scoped by file+datasource, not matchManagers (which can void the rule).",
+      "matchFileNames": [
+        "Makefile"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": false
     }
   ],
   "customManagers": [
@@ -125,7 +149,8 @@
       "description": "Update Makefile tool versions via inline renovate comments",
       "managerFilePatterns": ["/^Makefile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)(?: registryUrl=(?<registryUrl>[^\\s]+))?(?: versioning=(?<versioning>[^\\s]+))?(?: extractVersion=(?<extractVersion>[^\\s]+))?\\n[A-Z_]+\\s*[?:]?=\\s*(?<currentValue>[^\\s]+)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\n[A-Z0-9_]+\\s*:?=\\s*\\S+?:(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[0-9a-f]+)",
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s*\\n[A-Z0-9_]+\\s*:?=\\s*(?<currentValue>[^\\s/@]+)\\s*\\n"
       ]
     }
   ]

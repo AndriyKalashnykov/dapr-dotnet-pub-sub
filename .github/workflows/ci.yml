@@ -103,7 +103,7 @@ jobs:
           install: true
           cache: true
 
-      - name: Image-contract assertions (container-structure-test)
+      - name: Image contract test
         run: make image-test
 
   image-scan:
@@ -116,7 +116,7 @@ jobs:
 
       - uses: ./.github/actions/setup-dotnet-cached
 
-      - name: Image scan (Trivy, fixed-only HIGH/CRITICAL)
+      - name: Trivy image scan
         run: make image-scan
 
   e2e:
@@ -129,7 +129,7 @@ jobs:
 
       - uses: ./.github/actions/setup-dotnet-cached
 
-      - name: E2E (Compose-based)
+      - name: End-to-end test
         run: make e2e
 
       - name: Dump Compose logs on failure
@@ -152,10 +152,10 @@ jobs:
           install: true
           cache: true
 
-      - name: Bring up KinD + Dapr + Kafka
+      - name: Bring up KinD cluster
         run: make kind-up
 
-      - name: E2E (KinD)
+      - name: Run KinD end-to-end test
         run: make e2e-kind
 
       - name: Dump cluster state on failure
@@ -193,46 +193,61 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+      - name: Docker metadata
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          # Bare-semver Docker tags (strip the v): a v1.2.3 git tag -> :1.2.3, :1.2, :1.
+          # `latest` tracks main pushes (not the highest semver tag) — hence type=raw, not flavor.
           tags: |
             type=ref,event=branch
-            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+      - name: Build and push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         id: build
         with:
           context: .
           file: ${{ matrix.service }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: mode=max
-          sbom: true
+          # provenance/sbom default to false: cosign keyless signing (below) already
+          # covers supply-chain verification, and in-manifest attestations inject
+          # unknown/unknown entries that break the GHCR "OS / Arch" tab.
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Sign image (keyless OIDC)
+      - name: Sign image with cosign
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
           while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
             cosign sign --yes "${tag}@${DIGEST}"
           done <<< "${TAGS}"
 

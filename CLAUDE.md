@@ -25,7 +25,8 @@ make license-check            # Verify every source file carries an SPDX-License
 make mermaid-lint             # Validate Mermaid diagrams in markdown files
 make deps-prune               # Show redundant NuGet package references
 make deps-prune-check         # Verify no redundant NuGet package references
-make static-check             # Composite gate: lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
+make check-dotnet-alignment   # Verify .NET major.minor matches across global.json + both Dockerfiles
+make static-check             # Composite gate: check-dotnet-alignment + lint + license-check + vulncheck + trivy-fs + secrets + mermaid-lint + deps-prune-check
 make build                    # Restore + build entire solution
 make test                     # Run unit tests (Category=Unit, seconds)
 make integration-test         # Run integration tests (Category=Integration, in-process WebApplicationFactory)
@@ -105,14 +106,14 @@ The root-level `dapr.yaml` (not in `components/`) is the multi-app run template 
 
 ## Tech Stack
 
-- .NET 10 (pinned in `global.json` → `10.0.201`, `rollForward: latestFeature`)
-- Dapr SDK: `Dapr.AspNetCore` 1.17.8
+- .NET 10 (pinned in `global.json` → `10.0.203`, `rollForward: latestFeature`)
+- Dapr SDK: `Dapr.AspNetCore` 1.17.9
 - Kafka as the message broker (Confluent images)
-- Testing: TUnit 1.31.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
-- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `image-scan`/`e2e`/`e2e-kind` (parallel) → `docker` (main-only or v* tag, build + push to ghcr.io + cosign keyless OIDC sign) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `image-scan` job runs Trivy against the built producer/consumer images (HIGH/CRITICAL, fixed-only). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars + Jaeger). The `e2e-kind` job brings up a KinD cluster with cloud-provider-kind + Helm-installed Dapr + Kafka manifest + Jaeger and asserts subscription delivery through the producer's LoadBalancer IP. The `docker` job runs as a matrix over `[producer, consumer]`, builds with `provenance: mode=max` + `sbom: true`, pushes to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/<svc>`, and signs every digest with `sigstore/cosign-installer` keyless OIDC. License is MIT; every source file carries `SPDX-License-Identifier: MIT` (enforced by `make license-check`).
-- Static analysis: `make static-check` composite gate bundles `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
+- Testing: TUnit 1.44.0 + FakeItEasy 9.0.1 + `Microsoft.AspNetCore.Mvc.Testing` 10.0.5
+- CI: GitHub Actions — `changes` (path-filter gate) → `static-check` → `build`/`test` (parallel) → `image-test`/`image-scan`/`e2e`/`e2e-kind` (parallel) → `docker` (main-only or v* tag, build + push to ghcr.io + cosign keyless OIDC sign) → `ci-pass` gate job (single branch-protection check), plus weekly `cleanup-runs.yml` for old runs and caches. The `test` job runs `make coverage-check` (all Unit + Integration tests + 80% line threshold + cobertura artifact upload). The `image-test` job runs `make image-test` (container-structure-test contract assertions on user, ports, entrypoint, env, file existence). The `image-scan` job runs Trivy against the built producer/consumer images (HIGH/CRITICAL, fixed-only). The `e2e` job builds producer/consumer images and runs `scripts/e2e-compose.sh` against the full Compose stack (Kafka + Dapr sidecars + Jaeger). The `e2e-kind` job brings up a KinD cluster with cloud-provider-kind + Helm-installed Dapr + Kafka manifest + Jaeger and asserts subscription delivery through the producer's LoadBalancer IP. The `docker` job runs as a matrix over `[producer, consumer]`, builds multi-arch (`linux/amd64,linux/arm64`) with `provenance` + `sbom` off (cosign signing covers supply-chain verification), pushes bare-semver-tagged images to `ghcr.io/AndriyKalashnykov/dapr-dotnet-pub-sub/<svc>`, and signs every digest with `sigstore/cosign-installer` keyless OIDC. License is MIT; every source file carries `SPDX-License-Identifier: MIT` (enforced by `make license-check`).
+- Static analysis: `make static-check` composite gate bundles `check-dotnet-alignment` (verifies the .NET major.minor matches across `global.json` and both Dockerfiles — first prereq, fast-fail), `lint`, `vulncheck`, `trivy-fs`, `secrets` (gitleaks), `mermaid-lint` (mermaid-cli), and `deps-prune-check`
 - Coverage: `make coverage-check` runs the full test suite under `Microsoft.Testing.Extensions.CodeCoverage` and enforces an 80% line-rate threshold via cobertura output
-- Tool management: `.mise.toml` pins Node, Dapr CLI, and act — Renovate's `mise` manager tracks these natively. Remaining Makefile `_VERSION` constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.
+- Tool management: `.mise.toml` pins Node + eight `aqua:` tools (Dapr CLI, act, kind, kubectl, helm, cloud-provider-kind, cosign, container-structure-test) — Renovate's `mise` manager tracks these natively. The `kubernetes` manager tracks third-party images in `k8s/*.yaml`. Remaining Makefile constants (`DAPR_RUNTIME_VERSION`, `TRIVY_VERSION`, `GITLEAKS_VERSION`, `MERMAID_CLI_VERSION`, `DAPR_HELM_VERSION`, `KIND_NODE_IMAGE`, `ACT_UBUNTU_VERSION`) are tracked via inline `# renovate:` comments and the `custom.regex` manager.
 
 ### CI / act gap
 
