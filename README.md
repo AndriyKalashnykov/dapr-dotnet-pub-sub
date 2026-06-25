@@ -5,7 +5,7 @@
 
 # Dapr Pub/Sub on .NET 10 — Reference Service
 
-The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka, with OpenTelemetry traces exported to a Jaeger v2 backend (OTLP gRPC). The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a Compose-based real-sidecar e2e (`make e2e`), a KinD-based K8s e2e (`make kind-up && make e2e-kind`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy filesystem + image scan, gitleaks, Mermaid lint, SPDX license-check, cosign keyless OIDC image signing) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
+The **runtime surface** exposes a producer (`POST /send`, `POST /sendasbytes`) and consumer (content-based subscription routing on the `type` field) ASP.NET Core API pair wired through Dapr sidecars to Apache Kafka, with app-side OpenTelemetry plus Dapr sidecar traces exported to a Jaeger v2 backend (OTLP gRPC). The **delivery surface** covers a TUnit + FakeItEasy unit/integration suite over `WebApplicationFactory<Program>` with an 80% line-coverage threshold, a Compose-based real-sidecar e2e (`make e2e`), a KinD-based K8s e2e (`make kind-up && make e2e-kind`), and a GitHub Actions pipeline (`dotnet format` verify, `dotnet list package --vulnerable`, Trivy filesystem + image scan, gitleaks, Mermaid lint, SPDX license-check, cosign keyless OIDC image signing) on a `global.json`-pinned .NET 10 toolchain with Renovate-managed dependencies.
 
 ```mermaid
 C4Container
@@ -130,14 +130,17 @@ All three share the same Subscription routing rules; only the broker address and
 
 ### Observability — OpenTelemetry tracing
 
-Producer + consumer + Dapr sidecars emit OpenTelemetry traces. Both e2e flows ship a [Jaeger v2](https://www.jaegertracing.io/) all-in-one backend on the Dapr OTLP gRPC endpoint:
+Traces come from **two layers**, both exporting to the same [Jaeger v2](https://www.jaegertracing.io/) all-in-one backend over the OTLP gRPC endpoint, under one `service.name` per app (`producer`/`consumer`):
 
-| Flow | Backend address (Dapr sidecar → Jaeger) | Jaeger UI |
-|------|----------------------------------------|-----------|
+1. **App-side OpenTelemetry** — the producer/consumer instrument their own HTTP server spans (`AddAspNetCoreInstrumentation` + OTLP exporter), so the real `/send` and handler endpoints are traced. Gated on `OTEL_EXPORTER_OTLP_ENDPOINT` (set in Compose + K8s; unset for the local `dapr run` flow). See [ADR-011](docs/decisions.md).
+2. **Dapr sidecar tracing** — the [Configuration CRD](https://docs.dapr.io/operations/configuration/configuration-overview/) traces pub/sub publish/deliver through the sidecar.
+
+| Flow | OTLP endpoint (apps + sidecars → Jaeger) | Jaeger UI |
+|------|------------------------------------------|-----------|
 | Compose (`make e2e`) | `jaeger:4317` | <http://localhost:16686> |
 | KinD (`make kind-up`) | `jaeger.dapr-pubsub.svc.cluster.local:4317` | `kubectl --context=kind-dapr-pubsub -n dapr-pubsub port-forward svc/jaeger 16686:16686` → <http://localhost:16686> |
 
-The Dapr [Configuration CRD](https://docs.dapr.io/operations/configuration/configuration-overview/) (`compose/components/config.yaml` for Compose, `k8s/config.yaml` for K8s) selects the OTLP exporter with 100% sampling for the e2e use case. Producer/consumer pods opt in via the `dapr.io/config: tracing` annotation (K8s) or daprd's `--config /components/config.yaml` flag (Compose).
+The Dapr Configuration CRD (`compose/components/config.yaml` for Compose, `k8s/config.yaml` for K8s) selects the sidecar OTLP exporter with 100% sampling; pods opt in via the `dapr.io/config: tracing` annotation (K8s) or daprd's `--config /components/config.yaml` flag (Compose). The `make e2e`/`make e2e-kind` harnesses assert a real `/send` produces a `producer` trace (two-stage `/api/services` + `/api/traces` check).
 
 ### Infrastructure
 

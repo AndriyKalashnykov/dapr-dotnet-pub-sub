@@ -93,3 +93,21 @@ Non-obvious decisions and traps documented for the next contributor. Each entry 
 **Rejected.** Bare `kubectl ...` invocations relying on `~/.kube/config`'s current-context.
 
 **Failure mode.** Two `make` invocations from sibling KinD-using projects share `~/.kube/config`. A bare `kubectl get pods` resolves to whichever cluster was most recently set as current-context globally — even though THIS project's `make kind-up` just created its own cluster. Namespaces "vanish", rollouts wait on non-existent Deployments, e2e tests confidently assert against the wrong cluster. Pinning `--context=kind-<name>` removes the ambiguity.
+
+## ADR-011 — App-side OpenTelemetry, env-gated, alongside Dapr sidecar tracing
+
+**Decision.** The producer and consumer add app-side OpenTelemetry (`AddAspNetCoreInstrumentation` + OTLP exporter) that exports their own HTTP server spans to the same Jaeger OTLP endpoint the Dapr sidecar uses. It is **gated on `OTEL_EXPORTER_OTLP_ENDPOINT`** (set in `compose/docker-compose.yml` and `k8s/*.yaml`, unset for the local `dapr run` flow). `service.name` mirrors the Dapr app-id, so app + sidecar spans share one Jaeger service.
+
+**Rejected.** Relying solely on the Dapr sidecar's tracing.
+
+**Failure mode.** Dapr only traces operations that flow through the sidecar (service-invocation, pub/sub). A direct request to the app's own HTTP endpoint (`POST /send`) never enters the sidecar's traced ingress, so it produced **zero** spans — the app's actual entry point was untraced. Empirically: 13 `/send` calls landed no app spans; a sidecar-API publish landed spans. App-side OTel traces the real `/send` and handler endpoints; the e2e (`scripts/e2e-*.sh`) drives the real `/send` and asserts a `producer` trace lands in Jaeger (two-stage `/api/services` + `/api/traces` check).
+
+**Reproducing.** Unset `OTEL_EXPORTER_OTLP_ENDPOINT` on the producer, `make e2e`; the OTel trace assertion fails (no `producer` service in Jaeger from the app path).
+
+## ADR-012 — No Docker `HEALTHCHECK` in the producer/consumer images
+
+**Decision.** Neither `producer/Dockerfile` nor `consumer/Dockerfile` declares a `HEALTHCHECK`.
+
+**Rejected.** Adding a `HEALTHCHECK CMD curl …/dapr/config` to the runtime images.
+
+**Failure mode (of the rejected option).** Nothing consumes a Docker healthcheck here: Compose gates startup on `kafka`'s healthcheck (not the apps'), and Kubernetes uses the Deployments' `readinessProbe` (`/dapr/config`) + Dapr sidecar readiness — neither reads a container `HEALTHCHECK`. The `mcr.microsoft.com/dotnet/aspnet` runtime has no `curl`/`wget`, so a probe would require an `apt-get install` (added image weight + CVE surface) or a compiled health binary, for zero consumer benefit. The image contract (user, ports, entrypoint, env) is already verified by `make image-test` (container-structure-test) and the runtime is exercised by `make e2e`/`make e2e-kind`. If an orchestrator that gates on Docker health is ever introduced, add a boot-marker-safe probe then.

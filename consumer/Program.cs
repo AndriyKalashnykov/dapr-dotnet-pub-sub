@@ -2,6 +2,8 @@
 
 using Dapr.Client;
 using Common;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,20 @@ builder.WebHost.UseUrls($"http://*:{port}");
 // Add services for handling Dapr pub/sub
 builder.Services.AddDaprClient();
 builder.Services.AddControllers().AddDapr();
+
+// App-side OpenTelemetry tracing — exports the consumer's own HTTP handler spans
+// (/handletype1, /handletype2, /dafault-messagehandler) to the OTLP endpoint
+// (Jaeger). Gated on OTEL_EXPORTER_OTLP_ENDPOINT so the local `dapr run` flow
+// stays noise-free. service.name mirrors the Dapr app-id.
+if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+{
+    var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "consumer";
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(serviceName))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddOtlpExporter());
+}
 
 var app = builder.Build();
 app.UseCloudEvents();

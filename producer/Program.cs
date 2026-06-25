@@ -4,10 +4,28 @@ using System.Text;
 using System.Text.Json;
 using Dapr.Client;
 using Common;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDaprClient();
 builder.Services.AddLogging(logging => { logging.AddConsole(); });
+
+// App-side OpenTelemetry tracing — exports the app's own HTTP server spans to
+// the OTLP endpoint (Jaeger) so the real /send flow is traced, complementing
+// the Dapr sidecar's pub/sub spans. Gated on OTEL_EXPORTER_OTLP_ENDPOINT so the
+// local `dapr run` flow (which traces via the Dapr sidecar + zipkin) stays
+// noise-free. The OTLP exporter reads endpoint/protocol from the standard
+// OTEL_* env vars; service.name mirrors the Dapr app-id.
+if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+{
+    var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "producer";
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(serviceName))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddOtlpExporter());
+}
 
 // Configure Kestrel to listen on the port from DAPR_APP_PORT
 var daprPort = Environment.GetEnvironmentVariable("DAPR_APP_PORT");

@@ -79,6 +79,13 @@
       ]
     },
     {
+      "description": "Group OpenTelemetry packages (co-released, version-aligned)",
+      "groupName": "OpenTelemetry",
+      "matchPackageNames": [
+        "/^OpenTelemetry/"
+      ]
+    },
+    {
       "description": "Group Docker Compose images",
       "matchManagers": [
         "docker-compose"
