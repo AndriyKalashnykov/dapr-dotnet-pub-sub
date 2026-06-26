@@ -74,37 +74,43 @@ wait_log() {
     FAIL=$((FAIL + 1))
 }
 
-# Two-stage OTel check: a service name registers on its first-ever span and never
-# deregisters, so /api/services alone passes against stale state. Assert BOTH the
-# service is registered AND a trace was recorded during THIS run. With app-side
-# OpenTelemetry the producer's own /send HTTP handler is traced, so driving the
-# real publish endpoint (not a sidecar-API workaround) generates the span.
+# Two-stage OTel check per service: a name registers on its first-ever span and
+# never deregisters, so /api/services alone passes against stale state — assert
+# BOTH the service is registered AND a trace was recorded during THIS run. With
+# app-side OpenTelemetry the producer's /send AND the consumer's delivered-message
+# handlers are traced, so driving the real publish endpoint exercises both.
+assert_one_service_trace() {
+    local svc="$1"
+    local deadline=$(( $(date +%s) + JAEGER_POLL_SECONDS ))
+    local seen_svc="" seen_trace=""
+    while [[ $(date +%s) -lt $deadline ]]; do
+        if [[ "$seen_svc" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
+                "$JAEGER_API/api/services" 2>/dev/null | grep -q "\"$svc\""; then
+            seen_svc=yes
+        fi
+        if [[ "$seen_svc" == yes && "$seen_trace" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
+                "$JAEGER_API/api/traces?service=$svc&limit=1" 2>/dev/null | grep -q '"traceID"'; then
+            seen_trace=yes; break
+        fi
+        sleep "$POLL_INTERVAL"
+    done
+    if [[ "$seen_svc" == yes && "$seen_trace" == yes ]]; then
+        echo "PASS: OTel traces delivering for '$svc' (registered + trace recorded this run)"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL: OTel traces not delivering for '$svc' (service=${seen_svc:-no} trace=${seen_trace:-no}) within ${JAEGER_POLL_SECONDS}s"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 assert_traces_delivering() {
     for _ in 1 2 3 4 5; do
         curl -s -o /dev/null --max-time "$CURL_MAX_TIME" -X POST "$PRODUCER_URL/send" \
             -H 'Content-Type: application/json' \
             -d '{"id":"trace001-0000-0000-0000-000000000001","timeStamp":"2025-09-26T02:52:04.835Z","type":"1"}' || true
     done
-    local deadline=$(( $(date +%s) + JAEGER_POLL_SECONDS ))
-    local seen_svc="" seen_trace=""
-    while [[ $(date +%s) -lt $deadline ]]; do
-        if [[ "$seen_svc" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
-                "$JAEGER_API/api/services" 2>/dev/null | grep -q "\"$OTEL_PRODUCER_SERVICE\""; then
-            seen_svc=yes
-        fi
-        if [[ "$seen_svc" == yes && "$seen_trace" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
-                "$JAEGER_API/api/traces?service=$OTEL_PRODUCER_SERVICE&limit=1" 2>/dev/null | grep -q '"traceID"'; then
-            seen_trace=yes; break
-        fi
-        sleep "$POLL_INTERVAL"
-    done
-    if [[ "$seen_svc" == yes && "$seen_trace" == yes ]]; then
-        echo "PASS: OTel traces delivering to Jaeger (service '$OTEL_PRODUCER_SERVICE' registered + trace recorded this run)"
-        PASS=$((PASS + 1))
-    else
-        echo "FAIL: OTel traces not delivering (service=${seen_svc:-no} trace=${seen_trace:-no}) within ${JAEGER_POLL_SECONDS}s"
-        FAIL=$((FAIL + 1))
-    fi
+    assert_one_service_trace "$OTEL_PRODUCER_SERVICE"
+    assert_one_service_trace "$OTEL_CONSUMER_SERVICE"
 }
 
 # Exercise the producer's 500 error path through REAL Kestrel by stopping the
