@@ -100,7 +100,7 @@ Non-obvious decisions and traps documented for the next contributor. Each entry 
 
 **Rejected.** Relying solely on the Dapr sidecar's tracing.
 
-**Failure mode.** Dapr only traces operations that flow through the sidecar (service-invocation, pub/sub). A direct request to the app's own HTTP endpoint (`POST /send`) never enters the sidecar's traced ingress, so it produced **zero** spans — the app's actual entry point was untraced. Empirically: 13 `/send` calls landed no app spans; a sidecar-API publish landed spans. App-side OTel traces the real `/send` and handler endpoints; the e2e (`scripts/e2e-*.sh`) drives the real `/send` and asserts a `producer` trace lands in Jaeger (two-stage `/api/services` + `/api/traces` check).
+**Failure mode.** Dapr only traces operations that flow through the sidecar (service-invocation, pub/sub). A direct request to the app's own HTTP endpoint (`POST /send`) never enters the sidecar's traced ingress, so it produced **zero** spans — the app's actual entry point was untraced. Empirically: 13 `/send` calls landed no app spans; a sidecar-API publish landed spans. App-side OTel traces the real `/send` and handler endpoints; the e2e (`scripts/e2e-*.sh`) drives the real `/send` and asserts both the `producer` trace (the publish) and the `consumer` trace (the delivered-message handler) land in Jaeger (two-stage `/api/services` + `/api/traces` check per service).
 
 **Reproducing.** Unset `OTEL_EXPORTER_OTLP_ENDPOINT` on the producer, `make e2e`; the OTel trace assertion fails (no `producer` service in Jaeger from the app path).
 
