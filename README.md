@@ -140,7 +140,7 @@ Traces come from **two layers**, both exporting to the same [Jaeger v2](https://
 | Compose (`make e2e`) | `jaeger:4317` | <http://localhost:16686> |
 | KinD (`make kind-up`) | `jaeger.dapr-pubsub.svc.cluster.local:4317` | `kubectl --context=kind-dapr-pubsub -n dapr-pubsub port-forward svc/jaeger 16686:16686` → <http://localhost:16686> |
 
-The Dapr Configuration CRD (`compose/components/config.yaml` for Compose, `k8s/config.yaml` for K8s) selects the sidecar OTLP exporter with 100% sampling; pods opt in via the `dapr.io/config: tracing` annotation (K8s) or daprd's `--config /components/config.yaml` flag (Compose). The `make e2e`/`make e2e-kind` harnesses assert a real `/send` produces a `producer` trace (two-stage `/api/services` + `/api/traces` check).
+The Dapr Configuration CRD (`compose/components/config.yaml` for Compose, `k8s/config.yaml` for K8s) selects the sidecar OTLP exporter with 100% sampling; pods opt in via the `dapr.io/config: tracing` annotation (K8s) or daprd's `--config /components/config.yaml` flag (Compose). The `make e2e`/`make e2e-kind` harnesses assert that a real `/send` lands both a `producer` trace (the publish) and a `consumer` trace (the delivered-message handler) in Jaeger — a two-stage `/api/services` + `/api/traces` check per service.
 
 ### Infrastructure
 
