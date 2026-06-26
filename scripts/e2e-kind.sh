@@ -13,6 +13,7 @@ CURL_MAX_TIME="${CURL_MAX_TIME:-5}"
 JAEGER_POLL_SECONDS="${JAEGER_POLL_SECONDS:-60}"
 POLL_INTERVAL="${POLL_INTERVAL:-1}"
 OTEL_PRODUCER_SERVICE="${OTEL_PRODUCER_SERVICE:-producer}"
+OTEL_CONSUMER_SERVICE="${OTEL_CONSUMER_SERVICE:-consumer}"
 PASS=0
 FAIL=0
 
@@ -98,26 +99,32 @@ assert_traces_delivering() {
             -d '{"id":"trace001-0000-0000-0000-000000000001","timeStamp":"2025-09-26T02:52:04.835Z","type":"1"}' || true
     done
 
-    local deadline=$(( $(date +%s) + JAEGER_POLL_SECONDS ))
-    local seen_svc="" seen_trace=""
-    while [[ $(date +%s) -lt $deadline ]]; do
-        if [[ "$seen_svc" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
-                "http://localhost:${jaeger_port}/api/services" 2>/dev/null | grep -q "\"$OTEL_PRODUCER_SERVICE\""; then
-            seen_svc=yes
+    # Two-stage check for BOTH services: the producer's /send span and the
+    # consumer's delivered-message handler span (both app-side-OTel traced).
+    local jaeger_api="http://localhost:${jaeger_port}"
+    local svc
+    for svc in "$OTEL_PRODUCER_SERVICE" "$OTEL_CONSUMER_SERVICE"; do
+        local deadline=$(( $(date +%s) + JAEGER_POLL_SECONDS ))
+        local seen_svc="" seen_trace=""
+        while [[ $(date +%s) -lt $deadline ]]; do
+            if [[ "$seen_svc" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
+                    "${jaeger_api}/api/services" 2>/dev/null | grep -q "\"$svc\""; then
+                seen_svc=yes
+            fi
+            if [[ "$seen_svc" == yes && "$seen_trace" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
+                    "${jaeger_api}/api/traces?service=$svc&limit=1" 2>/dev/null | grep -q '"traceID"'; then
+                seen_trace=yes; break
+            fi
+            sleep "$POLL_INTERVAL"
+        done
+        if [[ "$seen_svc" == yes && "$seen_trace" == yes ]]; then
+            echo "PASS: OTel traces delivering for '$svc' (registered + trace recorded this run)"
+            PASS=$((PASS + 1))
+        else
+            echo "FAIL: OTel traces not delivering for '$svc' (service=${seen_svc:-no} trace=${seen_trace:-no}) within ${JAEGER_POLL_SECONDS}s"
+            FAIL=$((FAIL + 1))
         fi
-        if [[ "$seen_svc" == yes && "$seen_trace" != yes ]] && curl -sf --max-time "$CURL_MAX_TIME" \
-                "http://localhost:${jaeger_port}/api/traces?service=$OTEL_PRODUCER_SERVICE&limit=1" 2>/dev/null | grep -q '"traceID"'; then
-            seen_trace=yes; break
-        fi
-        sleep "$POLL_INTERVAL"
     done
-    if [[ "$seen_svc" == yes && "$seen_trace" == yes ]]; then
-        echo "PASS: OTel traces delivering to Jaeger (service '$OTEL_PRODUCER_SERVICE' registered + trace recorded this run)"
-        PASS=$((PASS + 1))
-    else
-        echo "FAIL: OTel traces not delivering (service=${seen_svc:-no} trace=${seen_trace:-no}) within ${JAEGER_POLL_SECONDS}s"
-        FAIL=$((FAIL + 1))
-    fi
 }
 
 echo "=== K8s e2e against $PRODUCER_URL ==="
